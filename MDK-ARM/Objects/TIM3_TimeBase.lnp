@@ -1,0 +1,27 @@
+--cpu Cortex-M0
+".\objects\main.o"
+".\objects\mm32g0001_it.o"
+".\objects\platform.o"
+".\objects\user.o"
+".\objects\hal_adc.o"
+".\objects\hal_crc.o"
+".\objects\hal_dbg.o"
+".\objects\hal_exti.o"
+".\objects\hal_flash.o"
+".\objects\hal_gpio.o"
+".\objects\hal_i2c.o"
+".\objects\hal_iwdg.o"
+".\objects\hal_misc.o"
+".\objects\hal_pwr.o"
+".\objects\hal_rcc.o"
+".\objects\hal_spi.o"
+".\objects\hal_syscfg.o"
+".\objects\hal_tim.o"
+".\objects\hal_uid.o"
+".\objects\hal_usart.o"
+".\objects\startup_mm32g0001_keil.o"
+".\objects\system_mm32g0001.o"
+--library_type=microlib --strict --scatter ".\Objects\TIM3_TimeBase.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list ".\Listings\TIM3_TimeBase.map" -o .\Objects\TIM3_TimeBase.axf
