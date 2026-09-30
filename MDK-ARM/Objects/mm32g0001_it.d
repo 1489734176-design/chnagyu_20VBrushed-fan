@@ -54,5 +54,5 @@
 .\objects\mm32g0001_it.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_tim.h
 .\objects\mm32g0001_it.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_usart.h
 .\objects\mm32g0001_it.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h
-.\objects\mm32g0001_it.o: ..\USER\user.h
+.\objects\mm32g0001_it.o: ..\main.h
 .\objects\mm32g0001_it.o: ..\mm32g0001_it.h

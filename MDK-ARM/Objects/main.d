@@ -54,5 +54,13 @@
 .\objects\main.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_tim.h
 .\objects\main.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_usart.h
 .\objects\main.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h
-.\objects\main.o: ..\USER\user.h
 .\objects\main.o: ..\main.h
+.\objects\main.o: ..\USER\power\power.h
+.\objects\main.o: ..\USER\motor\motor.h
+.\objects\main.o: ..\USER\key\key.h
+.\objects\main.o: ..\USER\led\led.h
+.\objects\main.o: ..\USER\adc\adc.h
+.\objects\main.o: ..\USER\battery\battery.h
+.\objects\main.o: ..\USER\charge\charge.h
+.\objects\main.o: ..\USER\timer\timer.h
+.\objects\main.o: ..\USER\app\app.h

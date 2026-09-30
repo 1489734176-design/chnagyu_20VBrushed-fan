@@ -22,6 +22,7 @@ void Battery_Init(void)
     battery_under_voltage = 0U;
 }
 
+#if BATTERY_MANAGEMENT_ENABLE
 /*
  * @brief 根据 VBus 电压线性计算一个基础电量百分比。
  * @param voltage_mv VBus 毫伏值。
@@ -45,6 +46,7 @@ static uint8_t Battery_ConvertPercent(uint32_t voltage_mv)
     percent /= (BATTERY_FULL_VOLTAGE_MV - BATTERY_EMPTY_VOLTAGE_MV);
     return (uint8_t)percent;
 }
+#endif
 
 /*
  * @brief 执行电量采样和简单滤波。

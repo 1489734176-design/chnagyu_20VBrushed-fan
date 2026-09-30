@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\..\TIM3_TimeBase;..\Device\MM32G0001\Include;..\Device\MM32G0001\HAL_Lib\inc;..\Device\CMSIS\Core\Include;..\USER;..\..\NX32G0001</IncludePath>
+              <IncludePath>..\..\TIM3_TimeBase;..\Device\MM32G0001\Include;..\Device\MM32G0001\HAL_Lib\inc;..\Device\CMSIS\Core\Include;..\USER;..\USER\config;..\USER\power;..\USER\motor;..\USER\key;..\USER\led;..\USER\adc;..\USER\battery;..\USER\charge;..\USER\timer;..\USER\app;..\..\NX32G0001</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -403,6 +403,51 @@
               <FileName>user.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\USER\user.c</FilePath>
+            </File>
+            <File>
+              <FileName>power.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\power\power.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\motor\motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>key.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\key\key.c</FilePath>
+            </File>
+            <File>
+              <FileName>led.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\led\led.c</FilePath>
+            </File>
+            <File>
+              <FileName>adc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\adc\adc.c</FilePath>
+            </File>
+            <File>
+              <FileName>battery.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\battery\battery.c</FilePath>
+            </File>
+            <File>
+              <FileName>charge.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\charge\charge.c</FilePath>
+            </File>
+            <File>
+              <FileName>timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\timer\timer.c</FilePath>
+            </File>
+            <File>
+              <FileName>app.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\app\app.c</FilePath>
             </File>
           </Files>
         </Group>

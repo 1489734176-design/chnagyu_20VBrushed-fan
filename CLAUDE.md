@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project and toolchain
 
-This is bare-metal C firmware for a battery-powered brushed fan with a rotary encoder, PWM light, Charlieplexed numeric display, charging indication, and low-power sleep. The directory is named `NX32G0001`, but the configured MCU is **MindMotion MM32G0001A1TC**, Cortex-M0, with 16 KiB flash at `0x08000000` and 2 KiB RAM at `0x20000000`.
+This is bare-metal C firmware for a battery-powered brushed fan with an integrated water pump, six status LEDs, a power-latch circuit, and (currently disabled) battery-gauge and charge management. The directory is named `NX32G0001`, but the configured MCU is **MindMotion MM32G0001A1TC**, Cortex-M0, with 16 KiB flash at `0x08000000` and 2 KiB RAM at `0x20000000`. The schematic main IC is silkscreened **NX32F100T** (TSSOP-20); it is treated as MM32G0001-compatible for the HAL/pack, but that part-to-part compatibility is **unverified** — confirm on hardware before trusting register-level behavior.
 
 The current build entry point is `MDK-ARM/TIM3_TimeBase.uvprojx`, target **`TIM3_TimeBase`**. The sample-derived name does not describe the full application. It selects **ARM Compiler 5.06 update 7 (build 960)**, not Arm Compiler 6, and device pack **MindMotion.MM32G0001_DFP.1.0.1**. It defines `USE_STDPERIPH_DRIVER` and links with MicroLIB. The Keil startup reserves a 512-byte stack and zero heap.
 
@@ -25,7 +25,7 @@ ROOT="$(pwd -W)"
 "$UV4" -r "$ROOT/MDK-ARM/TIM3_TimeBase.uvprojx" -t "TIM3_TimeBase" -o "$ROOT/MDK-ARM/rebuild.log"
 ```
 
-Alternatively, open the `.uvprojx` in Keil and build/rebuild target `TIM3_TimeBase`. Read the output log: uVision returns **0 for success without warnings, 1 for warnings, and 2 or higher for errors**. A verified full rebuild produced 0 errors and 3 existing unused-symbol warnings for `show_gear`, `gear_duty`, and `light_toggle` in `USER/user.c`; exit code 1 alone is not a failed compilation.
+Alternatively, open the `.uvprojx` in Keil and build/rebuild target `TIM3_TimeBase`. Read the output log: uVision returns **0 for success without warnings, 1 for warnings, and 2 or higher for errors**; exit code 1 alone is not a failed compilation. A verified full rebuild of the modular sources produces **0 errors, 0 warnings** (`Code=4360 RO-data=224 RW-data=68 ZI-data=516`). Battery and charge management are macro-gated off (see `USER/config/config.h`); code that is only referenced when they are enabled is wrapped in the same `#if` guard so it does not trip unused-symbol warnings while disabled.
 
 Outputs are `MDK-ARM/Objects/TIM3_TimeBase.axf` and `.hex`; the map is `MDK-ARM/Listings/TIM3_TimeBase.map`. `Objects/`, `Listings/`, and `.uvguix.*` contain generated output or IDE user state, not application source. The linker scatter file under `Objects/` is generated from the target memory settings.
 
@@ -33,8 +33,8 @@ There is **no automated test suite, single-test command, lint configuration, or 
 
 ### Project-file caveats
 
-- Keil uses explicit source lists, not directory discovery. Add new translation units to the appropriate group in the `.uvprojx`.
-- Keil's include list contains obsolete `..\..\TIM3_TimeBase` and directory-name-dependent `..\..\NX32G0001`, relative to `MDK-ARM/`. The latter currently supplies the root headers. Check these when moving or renaming the checkout.
+- Keil uses explicit source lists, not directory discovery. The APP group lists `main.c`, `mm32g0001_it.c`, `platform.c`, the `USER/user.c` stub, and each module's `.c` (`power`, `motor`, `key`, `led`, `adc`, `battery`, `charge`, `timer`, `app`). Adding a module means adding both its `.c` to the APP group **and** its folder to the C `IncludePath`.
+- The C `IncludePath` (relative to `MDK-ARM/`) carries obsolete `..\..\TIM3_TimeBase` and directory-name-dependent `..\..\NX32G0001` (the latter supplies root headers), plus `..\USER` and one entry per module folder (`..\USER\config`, `..\USER\power`, …, `..\USER\app`). Check these when moving or renaming the checkout.
 - **`EWARM/` is an unsynchronized legacy project**, not an equivalent current build: it references missing `tim3_timebase.c`, omits `USER/user.c` and its include directory, and uses old five-level-up paths to `Device/`. Its Debug/Release configurations need repair before use.
 
 ## Runtime architecture
@@ -43,32 +43,36 @@ There is **no automated test suite, single-test command, lint configuration, or 
 
 `Device/MM32G0001/Source/KEIL_StartAsm/startup_mm32g0001_keil.s` calls `SystemInit()` and the C runtime before `main()`. `Device/MM32G0001/Source/system_mm32g0001.c` selects **48 MHz HSI**, with undivided AHB/APB clocks; the IDE's 12 MHz clock metadata is not the runtime clock configuration.
 
-`main.c` initializes the platform, timers, ADC, display, key, encoder, and light, then seeds the battery estimate. Its foreground loop calls `app_task()` when `flag_1ms` is set. There is no RTOS:
+`main.c` calls `PLATFORM_Init()`, then `Power_Init()` first so the EN latch holds the rail up before the rest of init runs, then `Led_Init()`, `Motor_Init()`, `AppAdc_Init()`, `Key_Init()`, `AppTimer_Init()`, `Battery_Init()`, `Charge_Init()`, and `App_Init()`. Its foreground loop runs `App_Task()` once per set `flag_1ms`. There is no RTOS:
 
-- **TIM14 update interrupt**, in `mm32g0001_it.c`, runs approximately every 0.25 ms, calls `led_scan()`, and sets `flag_1ms` every fourth interrupt.
-- **SysTick** runs the separate millisecond countdown for blocking `PLATFORM_DelayMS()`; it does not schedule `app_task()`.
-- `flag_1ms` is a single flag, not a queued tick count. Blocking foreground work can coalesce application ticks while interrupt-driven display scanning continues. `disp_buf` is also shared between foreground code and the ISR.
+- **TIM14 update interrupt**, in `mm32g0001_it.c`, fires every 1 ms and sets `flag_1ms`. It no longer scans a display or divides by four; `AppTimer_Init()` in `USER/timer/timer.c` configures it (period = `TIM_GetTIMxClock(TIM14)/1000 - 1`).
+- **SysTick** runs the separate millisecond countdown for blocking `PLATFORM_DelayMS()`; it does not schedule `App_Task()`.
+- `flag_1ms` is a single flag, not a queued tick count. Blocking foreground work coalesces application ticks.
 
-`platform.c` provides the delay and vendor-demo console/LED helpers. `PLATFORM_Init()` currently initializes only the delay. Enabling the demo console or LEDs unchanged would reuse application pins, notably PA10 for the console versus the active key.
+`platform.c` provides the delay and vendor-demo console/LED helpers. `PLATFORM_Init()` currently initializes only the delay. The demo console/LED helpers reuse application pins and should stay disabled.
 
 ### Application and hardware coupling
 
-Most product behavior and board-level drivers are colocated in **`USER/user.c`**, with the public interface in `USER/user.h`. `platform.h` includes `hal_conf.h`, which exposes the peripheral HAL. `Device/MM32G0001/HAL_Lib/`, device register headers, and `Device/CMSIS/` provide the vendor support layer.
+Product behavior is split by function under `USER/<module>/`, each as `<module>.c` + `<module>.h`: `config` (central macros, `.h` only), `power`, `motor`, `key`, `led`, `adc`, `battery`, `charge`, `timer`, `app`. `USER/user.c` and `USER/user.h` are now compatibility stubs (`user.h` just includes `app.h`). `platform.h` includes `hal_conf.h`, which exposes the peripheral HAL; `Device/MM32G0001/HAL_Lib/`, device register headers, and `Device/CMSIS/` provide the vendor support layer.
 
-The active `app_task()` first scans input and updates charging, filtered battery percentage, and undervoltage protection, then handles `APP_OFF`, `APP_ON`, or `APP_SLEEP`:
+`App_Task()` (in `USER/app/app.c`) runs each 1 ms tick: it calls `Battery_Task()` and `Charge_Task()` (both no-ops while gated off), then `Key_Scan()`, then acts on key events. The state machine is `app_state_t { APP_STATE_OFF, APP_STATE_ON }`:
 
-- PA10 short press toggles the light; long press controls fan power. The active scanner emits short press on release after more than 50 nominal milliseconds, and long press after 1500, not the timings in older comments.
-- The PA0/PB0 quadrature encoder adjusts a 1–100 speed setpoint, with accelerated 10-step changes during sustained rotation. `APP_ON` alternates the speed display for 5 seconds and the battery display for 2 seconds; undervoltage forces the fan off and disables the light.
-- `APP_OFF` displays battery status before transitioning toward sleep. `enter_sleep()` disables TIM14 and ADC, changes GPIO modes, and configures **PA10/EXTI10 and PA11/EXTI11** as wake sources before DeepStop/WFI. `reinit()` restores the clock and GPIO setup, then enables ADC and TIM14. Charging prevents DeepStop entry. Changes to peripheral initialization must also account for this restoration path.
+- **K3 / PA12** is the ON/OFF key: a short press toggles power and returns early that tick. `App_Init()` powers on with fan gear 1 and pump gear 0.
+- **K1 / PA9** cycles the fan gear `1 → 2 → 3 → 1` while on.
+- **K2 / PA10** cycles the pump gear `0 → 1 → 2 → 3 → 0` while on.
+- `Key_Scan()` debounces each key for `KEY_DEBOUNCE_TIME_MS` (20 ms) and emits a short-press event on release.
 
-Important shared hardware resources:
+Battery gauge (`Battery_Task`) and charge control (`Charge_Task`) are written but wrapped in `#if BATTERY_MANAGEMENT_ENABLE` / `#if CHARGE_MANAGEMENT_ENABLE`, both `0` in `config.h`. While disabled they take no ADC samples and never change motor or power state; `Charge_SetEnable()` forces the CH_EN pin low. Enable them only after the fan/pump path is validated.
+
+Important hardware resources (verify polarity on hardware — the NX1031 gate-driver input polarity / PWM stop level is unconfirmed):
 
 | Resource | Current use and constraint |
 | --- | --- |
-| TIM3 CH3 / PA15 | Inverted motor drive, center-aligned PWM, prescaler 0, period 1199 (~20 kHz). Compare **1200 means off**, **0 means maximum drive**. Intermediate setpoints use `840 - (72 * cur_duty_percent) / 10`, with a special case for 100; this is not a direct percentage of ARR. |
-| TIM14 CH1 / PA9 | Light PWM shares TIM14 with the display scan and application timebase. Changing TIM14 period/prescaler changes all three. |
-| PA4–PA8 | Five-pin Charlieplexed display, scanned in 18 steps. Foreground helpers prepare `disp_buf[6]`; the ISR consumes it. The buffer layout is documented in `USER/user.h`. |
-| PB1 / ADC channel 0 | Battery sensing. Despite its name, `ADC_GetChannelVoltage()` returns raw 12-bit ADC counts. Battery tables, filtering, and protection thresholds are in `USER/user.c`; current conversion uses `VREF_MV=5000` and `BAT_DIVIDER=2`. |
-| PA11 / ADC channel 4; PA12 | Charge detection and active-low charge-full input. PA11 is repurposed as an EXTI wake input during sleep. |
+| TIM1 CH1N / PA5 (AF1) — fan | Center-aligned PWM at `MOTOR_PWM_FREQUENCY_HZ` (16 kHz); period = `TIM_GetTIMxClock(TIM1)/(2*16000) - 1` (≈1499 @48 MHz), duty via `TIM_SetCompare1`. Gears: 1 = 32 %, 2 = 18 %, 3 = 0 %. Gated by `TIM_CCxNCmd(TIM1, TIM_Channel_1, …)`. |
+| TIM1 CH3 / PA6 (AF4) — pump | Same timer/period, independent CCR via `TIM_SetCompare3`. Gears: 0 = channel off, 1 = 30 %, 2 = 10 %, 3 = 0 %. Gated by `TIM_CCxCmd(TIM1, TIM_Channel_3, …)`. Both channels share `MOE` via `TIM_CtrlPWMOutputs`. |
+| PA4 = EN, PA15 = CH_EN | Power latch. `Power_Init()` drives CH_EN low then EN high (keep-alive), push-pull. `Power_SafePowerOff()` drops CH_EN then EN. CH_EN defaults low and is forced low while charge management is disabled. |
+| Keys PA12 / PA9 / PA10 | K3 / K1 / K2, active-low with pull-ups, 1 ms polled (no EXTI). Event bits `KEY_EVENT_K3/K1/K2`. |
+| LEDs PA11/PA1/PA0/PA7/PA8/PA3 | LED1..LED6, active-low (MCU low = on), push-pull. `Led_Set`, `Led_SetMask`, `Led_AllOff`. |
+| ADC1, 12-bit any-channel | VBus = CH0 / PB1, CH_VIN = CH1 / PB0 (both divide by `VBUS_DIVIDER_RATIO`/`CHARGE_INPUT_DIVIDER_RATIO` = 11), I_SENSE = CH5 / PA2 over the 5 mΩ shunt. Helpers in `USER/adc/adc.c` return mV / mA; `APP_ADC_VREF_MV = 5000`. |
 
-Several comments and disabled `#if 0` implementations still describe PB0 as a power key, a five-gear UI/`APP_BAT`, a 2399 PWM period, or a 1:11 battery divider. **Use active code, constants, and project source lists as the authority**, not those historical descriptions. Application sources contain Chinese comments and currently use UTF-8-compatible text with LF newlines; preserve them when editing.
+The `mm32g0001_it.c` EXTI0_1 / EXTI4_15 handlers only clear pending bits; no wake source is armed (there is no sleep path in the current build). Application sources use Chinese comments in UTF-8 with LF newlines; preserve them when editing. When historical comments and active code disagree, **the active code, `config.h` constants, and the project source list are the authority**.
