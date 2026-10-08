@@ -3,7 +3,6 @@
 .\objects\charge.o: D:\Users\mym02\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\charge.o: ..\USER\config\config.h
 .\objects\charge.o: ..\USER\adc\adc.h
-.\objects\charge.o: ..\USER\battery\battery.h
 .\objects\charge.o: ..\USER\power\power.h
 .\objects\charge.o: ..\..\NX32G0001\platform.h
 .\objects\charge.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_conf.h

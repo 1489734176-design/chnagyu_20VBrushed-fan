@@ -1,6 +1,6 @@
 Dependencies for Project 'TIM3_TimeBase', Target 'TIM3_TimeBase': (DO NOT MODIFY !)
 CompilerVersion: 5060960::V5.06 update 7 (build 960)::.\ARMCC
-F (..\main.c)(0x6ABCCE2D)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\main.o --omf_browse .\objects\main.crf --depend .\objects\main.d)
+F (..\main.c)(0x6AC70306)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\main.o --omf_browse .\objects\main.crf --depend .\objects\main.d)
 I (..\platform.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_conf.h)(0x69D47808)
 I (..\Device\MM32G0001\Include\mm32_device.h)(0x69D47808)
@@ -47,10 +47,10 @@ I (..\USER\motor\motor.h)(0x6ABCA6D5)
 I (..\USER\key\key.h)(0x6ABCA733)
 I (..\USER\led\led.h)(0x6ABCA733)
 I (..\USER\adc\adc.h)(0x6ABCA78E)
-I (..\USER\battery\battery.h)(0x6ABCA78F)
+I (..\USER\battery\battery.h)(0x6AC702DE)
 I (..\USER\charge\charge.h)(0x6ABCA7F0)
 I (..\USER\timer\timer.h)(0x6ABCA7F1)
-I (..\USER\app\app.h)(0x6ABCA7F1)
+I (..\USER\app\app.h)(0x6AC702DE)
 F (..\mm32g0001_it.c)(0x6ABCA830)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\mm32g0001_it.o --omf_browse .\objects\mm32g0001_it.crf --depend .\objects\mm32g0001_it.d)
 I (..\platform.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_conf.h)(0x69D47808)
@@ -138,7 +138,7 @@ I (..\Device\MM32G0001\HAL_Lib\inc\hal_usart.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h)(0x69D47808)
 F (..\USER\user.c)(0x6ABCA830)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\user.o --omf_browse .\objects\user.crf --depend .\objects\user.d)
 I (..\USER\user.h)(0x6ABCA830)
-I (..\USER\app\app.h)(0x6ABCA7F1)
+I (..\USER\app\app.h)(0x6AC702DE)
 I (D:\Users\mym02\AppData\Local\Keil_v5\ARM\ARMCC\include\stdint.h)(0x5E8E3CC2)
 F (..\USER\power\power.c)(0x6ABCA6D5)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\power.o --omf_browse .\objects\power.crf --depend .\objects\power.d)
 I (..\USER\power\power.h)(0x6ABCA6D5)
@@ -182,7 +182,7 @@ I (..\Device\MM32G0001\HAL_Lib\inc\hal_syscfg.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_tim.h)(0x6AA25B4C)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_usart.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h)(0x69D47808)
-I (..\USER\config\config.h)(0x6ABCA6D5)
+I (..\USER\config\config.h)(0x6AC70526)
 F (..\USER\motor\motor.c)(0x6ABCE69A)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\motor.o --omf_browse .\objects\motor.crf --depend .\objects\motor.d)
 I (..\USER\motor\motor.h)(0x6ABCA6D5)
 I (D:\Users\mym02\AppData\Local\Keil_v5\ARM\ARMCC\include\stdint.h)(0x5E8E3CC2)
@@ -225,7 +225,7 @@ I (..\Device\MM32G0001\HAL_Lib\inc\hal_syscfg.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_tim.h)(0x6AA25B4C)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_usart.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h)(0x69D47808)
-I (..\USER\config\config.h)(0x6ABCA6D5)
+I (..\USER\config\config.h)(0x6AC70526)
 F (..\USER\key\key.c)(0x6ABCA733)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\key.o --omf_browse .\objects\key.crf --depend .\objects\key.d)
 I (..\USER\key\key.h)(0x6ABCA733)
 I (D:\Users\mym02\AppData\Local\Keil_v5\ARM\ARMCC\include\stdint.h)(0x5E8E3CC2)
@@ -268,7 +268,7 @@ I (..\Device\MM32G0001\HAL_Lib\inc\hal_syscfg.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_tim.h)(0x6AA25B4C)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_usart.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h)(0x69D47808)
-I (..\USER\config\config.h)(0x6ABCA6D5)
+I (..\USER\config\config.h)(0x6AC70526)
 F (..\USER\led\led.c)(0x6ABCBDCB)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\led.o --omf_browse .\objects\led.crf --depend .\objects\led.d)
 I (..\USER\led\led.h)(0x6ABCA733)
 I (D:\Users\mym02\AppData\Local\Keil_v5\ARM\ARMCC\include\stdint.h)(0x5E8E3CC2)
@@ -353,18 +353,17 @@ I (..\Device\MM32G0001\HAL_Lib\inc\hal_syscfg.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_tim.h)(0x6AA25B4C)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_usart.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h)(0x69D47808)
-I (..\USER\config\config.h)(0x6ABCA6D5)
-F (..\USER\battery\battery.c)(0x6ABCAF3F)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\battery.o --omf_browse .\objects\battery.crf --depend .\objects\battery.d)
-I (..\USER\battery\battery.h)(0x6ABCA78F)
+I (..\USER\config\config.h)(0x6AC70526)
+F (..\USER\battery\battery.c)(0x6AC70306)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\battery.o --omf_browse .\objects\battery.crf --depend .\objects\battery.d)
+I (..\USER\battery\battery.h)(0x6AC702DE)
 I (D:\Users\mym02\AppData\Local\Keil_v5\ARM\ARMCC\include\stdint.h)(0x5E8E3CC2)
-I (..\USER\config\config.h)(0x6ABCA6D5)
+I (..\USER\config\config.h)(0x6AC70526)
 I (..\USER\adc\adc.h)(0x6ABCA78E)
-F (..\USER\charge\charge.c)(0x6ABCA7F0)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\charge.o --omf_browse .\objects\charge.crf --depend .\objects\charge.d)
+F (..\USER\charge\charge.c)(0x6AC70319)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\charge.o --omf_browse .\objects\charge.crf --depend .\objects\charge.d)
 I (..\USER\charge\charge.h)(0x6ABCA7F0)
 I (D:\Users\mym02\AppData\Local\Keil_v5\ARM\ARMCC\include\stdint.h)(0x5E8E3CC2)
-I (..\USER\config\config.h)(0x6ABCA6D5)
+I (..\USER\config\config.h)(0x6AC70526)
 I (..\USER\adc\adc.h)(0x6ABCA78E)
-I (..\USER\battery\battery.h)(0x6ABCA78F)
 I (..\USER\power\power.h)(0x6ABCA6D5)
 I (..\..\NX32G0001\platform.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_conf.h)(0x69D47808)
@@ -447,8 +446,8 @@ I (..\Device\MM32G0001\HAL_Lib\inc\hal_syscfg.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_tim.h)(0x6AA25B4C)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_usart.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h)(0x69D47808)
-F (..\USER\app\app.c)(0x6ABCC6CC)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\app.o --omf_browse .\objects\app.crf --depend .\objects\app.d)
-I (..\USER\app\app.h)(0x6ABCA7F1)
+F (..\USER\app\app.c)(0x6AC704D2)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\app.o --omf_browse .\objects\app.crf --depend .\objects\app.d)
+I (..\USER\app\app.h)(0x6AC702DE)
 I (D:\Users\mym02\AppData\Local\Keil_v5\ARM\ARMCC\include\stdint.h)(0x5E8E3CC2)
 I (..\USER\key\key.h)(0x6ABCA733)
 I (..\USER\led\led.h)(0x6ABCA733)
@@ -493,7 +492,7 @@ I (..\Device\MM32G0001\HAL_Lib\inc\hal_syscfg.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_tim.h)(0x6AA25B4C)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_usart.h)(0x69D47808)
 I (..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h)(0x69D47808)
-I (..\USER\battery\battery.h)(0x6ABCA78F)
+I (..\USER\battery\battery.h)(0x6AC702DE)
 I (..\USER\charge\charge.h)(0x6ABCA7F0)
 F (..\readme.txt)(0x69D47808)()
 F (..\Device\MM32G0001\HAL_Lib\src\hal_adc.c)(0x69D47808)(-c --cpu Cortex-M0 -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\TIM3_TimeBase -I ..\Device\MM32G0001\Include -I ..\Device\MM32G0001\HAL_Lib\inc -I ..\Device\CMSIS\Core\Include -I ..\USER -I ..\USER\config -I ..\USER\power -I ..\USER\motor -I ..\USER\key -I ..\USER\led -I ..\USER\adc -I ..\USER\battery -I ..\USER\charge -I ..\USER\timer -I ..\USER\app -I ..\..\NX32G0001-D__UVISION_VERSION="541" -DUSE_STDPERIPH_DRIVER-o .\objects\hal_adc.o --omf_browse .\objects\hal_adc.crf --depend .\objects\hal_adc.d)

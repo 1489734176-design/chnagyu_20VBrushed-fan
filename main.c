@@ -32,7 +32,7 @@ int main(void)
     Key_Init();
     AppTimer_Init();
 
-    /* 初始化电量、充电和产品状态机。 */
+    /* ADC 已就绪，先快速检查电池欠压/过压，再初始化充电和产品状态机。 */
     Battery_Init();
     Charge_Init();
     App_Init();

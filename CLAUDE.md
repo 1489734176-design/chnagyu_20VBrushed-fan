@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project and toolchain
 
-This is bare-metal C firmware for a battery-powered brushed fan with an integrated water pump, six status LEDs, a power-latch circuit, and (currently disabled) battery-gauge and charge management. The directory is named `NX32G0001`, but the configured MCU is **MindMotion MM32G0001A1TC**, Cortex-M0, with 16 KiB flash at `0x08000000` and 2 KiB RAM at `0x20000000`. The schematic main IC is silkscreened **NX32F100T** (TSSOP-20); it is treated as MM32G0001-compatible for the HAL/pack, but that part-to-part compatibility is **unverified** — confirm on hardware before trusting register-level behavior.
+This is bare-metal C firmware for a battery-powered brushed fan with an integrated water pump, six gear-status LEDs, a power-latch circuit, enabled battery undervoltage/overvoltage protection, and currently disabled charge management. There is no battery-percentage calculation or display. The directory is named `NX32G0001`, but the configured MCU is **MindMotion MM32G0001A1TC**, Cortex-M0, with 16 KiB flash at `0x08000000` and 2 KiB RAM at `0x20000000`. The schematic main IC is silkscreened **NX32F100T** (TSSOP-20); it is treated as MM32G0001-compatible for the HAL/pack, but that part-to-part compatibility is **unverified** — confirm on hardware before trusting register-level behavior.
 
 The current build entry point is `MDK-ARM/TIM3_TimeBase.uvprojx`, target **`TIM3_TimeBase`**. The sample-derived name does not describe the full application. It selects **ARM Compiler 5.06 update 7 (build 960)**, not Arm Compiler 6, and device pack **MindMotion.MM32G0001_DFP.1.0.1**. It defines `USE_STDPERIPH_DRIVER` and links with MicroLIB. The Keil startup reserves a 512-byte stack and zero heap.
 
@@ -25,7 +25,7 @@ ROOT="$(pwd -W)"
 "$UV4" -r "$ROOT/MDK-ARM/TIM3_TimeBase.uvprojx" -t "TIM3_TimeBase" -o "$ROOT/MDK-ARM/rebuild.log"
 ```
 
-Alternatively, open the `.uvprojx` in Keil and build/rebuild target `TIM3_TimeBase`. Read the output log: uVision returns **0 for success without warnings, 1 for warnings, and 2 or higher for errors**; exit code 1 alone is not a failed compilation. A verified full rebuild of the modular sources produces **0 errors, 0 warnings** (`Code=4360 RO-data=224 RW-data=68 ZI-data=516`). Battery and charge management are macro-gated off (see `USER/config/config.h`); code that is only referenced when they are enabled is wrapped in the same `#if` guard so it does not trip unused-symbol warnings while disabled.
+Alternatively, open the `.uvprojx` in Keil and build/rebuild target `TIM3_TimeBase`. Read the output log: uVision returns **0 for success without warnings, 1 for warnings, and 2 or higher for errors**; exit code 1 alone is not a failed compilation. A verified full rebuild with voltage protection enabled produces **0 errors, 0 warnings** (`Code=5508 RO-data=236 RW-data=68 ZI-data=516`). `BATTERY_PROTECTION_ENABLE=1` and `CHARGE_MANAGEMENT_ENABLE=0` in `USER/config/config.h`; code used only by optional features remains inside the corresponding `#if` guard.
 
 Outputs are `MDK-ARM/Objects/TIM3_TimeBase.axf` and `.hex`; the map is `MDK-ARM/Listings/TIM3_TimeBase.map`. `Objects/`, `Listings/`, and `.uvguix.*` contain generated output or IDE user state, not application source. The linker scatter file under `Objects/` is generated from the target memory settings.
 
@@ -55,14 +55,21 @@ There is **no automated test suite, single-test command, lint configuration, or 
 
 Product behavior is split by function under `USER/<module>/`, each as `<module>.c` + `<module>.h`: `config` (central macros, `.h` only), `power`, `motor`, `key`, `led`, `adc`, `battery`, `charge`, `timer`, `app`. `USER/user.c` and `USER/user.h` are now compatibility stubs (`user.h` just includes `app.h`). `platform.h` includes `hal_conf.h`, which exposes the peripheral HAL; `Device/MM32G0001/HAL_Lib/`, device register headers, and `Device/CMSIS/` provide the vendor support layer.
 
-`App_Task()` (in `USER/app/app.c`) runs each 1 ms tick: it calls `Battery_Task()` and `Charge_Task()` (both no-ops while gated off), then `Key_Scan()`, then acts on key events. The state machine is `app_state_t { APP_STATE_OFF, APP_STATE_ON }`:
+`App_Task()` (in `USER/app/app.c`) runs each 1 ms tick: it calls `Battery_Task()` and `Charge_Task()` (charge management remains disabled), then scans keys and applies voltage protection before gear changes. The state machine is `app_state_t { APP_STATE_OFF, APP_STATE_ON, APP_STATE_PROTECT }`:
 
-- **K3 / PA12** is the ON/OFF key: a short press toggles power and returns early that tick. `App_Init()` powers on with fan gear 1 and pump gear 0.
+- **K3 / PA12** is the ON/OFF key. `App_Init()` keeps the motors stopped (preserving the previously commented-out automatic start), and ignores the release of K3 if it was held during boot. A subsequent short press starts fan gear 1 and pump gear 0 only after `Battery_CheckBeforeStart()` succeeds. K3 powers off from ON or PROTECT.
 - **K1 / PA9** cycles the fan gear `1 → 2 → 3 → 1` while on.
 - **K2 / PA10** cycles the pump gear `0 → 1 → 2 → 3 → 0` while on.
 - `Key_Scan()` debounces each key for `KEY_DEBOUNCE_TIME_MS` (20 ms) and emits a short-press event on release.
+- **PROTECT** stops both motors and all gear LEDs and disables charging, but does not drop EN, allowing ongoing ADC sampling. Once all faults clear, it returns to OFF without restarting, discards events on that recovery tick, and requires a new K3 operation. Keeping EN means the MCU still draws standby current; K3 can explicitly release EN.
 
-Battery gauge (`Battery_Task`) and charge control (`Charge_Task`) are written but wrapped in `#if BATTERY_MANAGEMENT_ENABLE` / `#if CHARGE_MANAGEMENT_ENABLE`, both `0` in `config.h`. While disabled they take no ADC samples and never change motor or power state; `Charge_SetEnable()` forces the CH_EN pin low. Enable them only after the fan/pump path is validated.
+Battery protection is enabled with `BATTERY_PROTECTION_ENABLE=1` in `config.h`. It has no percentage/SOC calculation or display. `Battery_Init()` (called only in `main.c`, after ADC setup) and `Battery_CheckBeforeStart()` immediately sample VBus and latch unsafe voltages; the start check never clears an existing latch. Periodic detection uses independent saturating counters, incrementing on fault samples and decrementing on normal samples, adapted from the reference drill's `Volt_Handler`:
+
+- Undervoltage: **VBus <= 13.5 V**, 300 fault counts; after latching, recovery requires **VBus >= 15.5 V continuously for 300 task ticks**.
+- Overvoltage: **VBus >= 24 V**, 300 fault counts; recovery requires **VBus < 24 V continuously for 300 task ticks** (no separate voltage hysteresis).
+- Both faults must clear before another start is allowed. Recovery is not an automatic motor restart. Counts correspond to milliseconds only while the foreground services every 1 ms tick; the single tick flag can coalesce delays.
+
+Charge control remains gated off by `CHARGE_MANAGEMENT_ENABLE=0`; `Charge_SetEnable()` forces CH_EN low. The optional `Charge_Task()` input-detection branch also leaves CH_EN off because no validated charge-termination policy replaces the removed percentage check. Do not use the 24 V overvoltage threshold as a battery-full charging threshold.
 
 Important hardware resources (verify polarity on hardware — the NX1031 gate-driver input polarity / PWM stop level is unconfirmed):
 

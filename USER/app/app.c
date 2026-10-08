@@ -6,7 +6,7 @@
 #include "battery.h"
 #include "charge.h"
 
-/* 当前应用状态，复位后由 App_Init 设置为开机状态。 */
+/* 当前应用状态，复位后先停机等待 K3，异常电压则进入保护状态。 */
 static app_state_t app_state = APP_STATE_OFF;
 
 /* 当前风扇档位，开机默认 1 档。 */
@@ -16,7 +16,7 @@ static uint8_t fan_gear = MOTOR_FAN_GEAR_MIN;
 static uint8_t pump_gear = MOTOR_PUMP_GEAR_MIN;
 
 /*
- * 上电开机时 K3 仍被按住，这一次按压的“释放”不能当作关机。
+ * 上电时 K3 仍可能被按住，这一次按压的释放不能当作新的开关机指令。
  * 1 表示还需忽略一次 K3 事件（即上电那次按压的释放）。
  */
 static uint8_t app_ignore_first_k3 = 0U;
@@ -79,11 +79,29 @@ static void App_PowerOff(void)
 }
 
 /*
+ * @brief 电压保护停机，不释放 EN，以便继续采样并判断恢复条件。
+ * @note 停止风扇、水泵和指示灯；用户仍可按 K3 真正关机。
+ */
+static void App_EnterProtection(void)
+{
+    Motor_StopAll();
+    Charge_SetEnable(0U);
+    Led_AllOff();
+    app_state = APP_STATE_PROTECT;
+}
+
+/*
  * @brief 执行应用开机流程。
- * @note K3 由硬件先启动电源，软件再拉高 EN 并恢复用户要求的默认档位。
+ * @note 启动前快速检查当前电压，已有保护锁存只能由 Battery_Task 滤波解除。
  */
 static void App_PowerOn(void)
 {
+    if (Battery_CheckBeforeStart() == 0U)
+    {
+        App_EnterProtection();
+        return;
+    }
+
     Power_SetKeepAlive(1U);
     Charge_SetEnable(0U);
     fan_gear = MOTOR_FAN_GEAR_MIN;
@@ -97,49 +115,67 @@ static void App_PowerOn(void)
 }
 
 /*
- * @brief 初始化应用。
- * @note 硬件为自锁存电源：不按 K3 时整机断电、功耗为 0；按下 K3 才给 MCU 上电。
- *       因此 MCU 一旦运行到这里，就代表用户刚按 K3 开机，直接进入开机状态、风扇立即转。
- *       上电那一次 K3 仍处于按下状态，需要忽略它的释放事件，避免刚开机就被当作关机。
+ * @brief 初始化应用，保持当前上电不自动启动电机的行为。
+ * @note Power_Init 已接管 EN；main 中已经完成电池快速检查和充电初始化，
+ *       这里不能再次初始化电池，否则会丢失已经锁存的保护状态。
  */
 void App_Init(void)
 {
-    /* 关闭可选管理模块，Power_Init 已拉高 EN 完成自锁存保持。 */
+    Motor_StopAll();
     Charge_SetEnable(0U);
-    Battery_Init();
-    Charge_Init();
+    Led_AllOff();
+    app_state = APP_STATE_OFF;
+    fan_gear = MOTOR_FAN_GEAR_MIN;
+    pump_gear = MOTOR_PUMP_GEAR_MIN;
 
     /* 若上电时 K3 仍被按住，则忽略这一次按压的释放事件。 */
     app_ignore_first_k3 = (Key_IsPressed(KEY_EVENT_K3) != 0U) ? 1U : 0U;
 
-    /* 上电即开机：风扇 1 档直接转，水泵 0 档，点亮对应指示灯。 */
-//    App_PowerOn();
+    if (Battery_IsProtected() != 0U)
+    {
+        App_EnterProtection();
+    }
 }
 
 /*
  * @brief 处理一个 1 ms 应用周期。
- * @note K3 优先级最高；K1 只改变风扇，K2 只改变水泵，关机状态忽略档位键。
+ * @note 电压保护优先于档位控制；K3 可在运行或保护状态下关机。
  */
 void App_Task(void)
 {
     uint8_t key_events;
 
-    /* 电量和充电代码已写好，但当前两个宏关闭，不会影响主状态机。 */
+    /* 先检测电压，再处理按键，防止保护触发当拍仍调整电机输出。 */
     Battery_Task();
     Charge_Task();
     key_events = Key_Scan();
 
-    /* K3 短按在开关机之间切换，优先于同一周期的其他按键。 */
+    if (((key_events & KEY_EVENT_K3) != 0U) && (app_ignore_first_k3 != 0U))
+    {
+        /* 上电那次 K3 释放不作为新指令，但本周期仍须执行电压保护。 */
+        app_ignore_first_k3 = 0U;
+        key_events = 0U;
+    }
+
+    if (Battery_IsProtected() != 0U)
+    {
+        if (app_state != APP_STATE_PROTECT)
+        {
+            App_EnterProtection();
+        }
+    }
+    else if (app_state == APP_STATE_PROTECT)
+    {
+        /* 恢复只解除停机锁定，不自动转动；丢弃当拍按键，等待新的 K3 操作。 */
+        app_state = APP_STATE_OFF;
+        return;
+    }
+
+    /* K3 优先于档位键；保护状态也允许释放 EN 进行真正关机。 */
     if ((key_events & KEY_EVENT_K3) != 0U)
     {
-        if (app_ignore_first_k3 != 0U)
+        if ((app_state == APP_STATE_ON) || (app_state == APP_STATE_PROTECT))
         {
-            /* 忽略上电开机那一次按压的释放，保持开机状态、风扇继续转。 */
-            app_ignore_first_k3 = 0U;
-        }
-        else if (app_state == APP_STATE_ON)
-        {
-            /* 开机状态再按 K3：关机并释放 EN，整机断电、功耗回到 0。 */
             App_PowerOff();
         }
         else
@@ -149,7 +185,7 @@ void App_Task(void)
         return;
     }
 
-    /* 关机状态只等待 K3，不响应档位按键。 */
+    /* 关机和保护状态均不响应档位按键。 */
     if (app_state != APP_STATE_ON)
     {
         return;

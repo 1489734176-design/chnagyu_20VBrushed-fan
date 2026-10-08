@@ -3,11 +3,12 @@
 
 #include <stdint.h>
 
-/* 应用状态：ON 为正常工作，OFF 为关机安全状态。 */
+/* 应用状态：OFF 等待开机，ON 正常工作，PROTECT 停机并等待电压恢复。 */
 typedef enum
 {
     APP_STATE_OFF = 0U,
-    APP_STATE_ON = 1U
+    APP_STATE_ON = 1U,
+    APP_STATE_PROTECT = 2U
 } app_state_t;
 
 /* 初始化应用状态和默认档位。 */

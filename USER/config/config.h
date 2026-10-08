@@ -12,10 +12,10 @@
 /* 两路电机共用的 PWM 载波频率，用户要求为 16 kHz。 */
 #define MOTOR_PWM_FREQUENCY_HZ              (16000UL)
 
-/* 电量管理代码开关：0=保留代码但不参与应用运行，1=启用电量计算和欠压处理。 */
-#define BATTERY_MANAGEMENT_ENABLE          (0U)
+/* 电池电压保护开关：0=关闭保护，1=启用欠压/过压保护，不计算或显示电量。 */
+#define BATTERY_PROTECTION_ENABLE          (1U)
 
-/* 充电管理代码开关：0=禁止检测和 CH_EN，1=允许充电状态机控制 CH_EN。 */
+/* 充电管理开关：0=禁止检测和 CH_EN，1=允许检测/显式控制；自动充电策略尚未启用。 */
 #define CHARGE_MANAGEMENT_ENABLE           (0U)
 
 /* ADC 参考电压，实际值应在新芯片资料和实测后校准。 */
@@ -36,9 +36,18 @@
 /* 按键去抖时间，主任务按 TIM14 产生的 1 ms 节拍调用。 */
 #define KEY_DEBOUNCE_TIME_MS               (20U)
 
-/* 电池电压曲线的默认参数，启用电量管理前必须结合电芯规格复核。 */
-#define BATTERY_FULL_VOLTAGE_MV            (8400UL)
-#define BATTERY_EMPTY_VOLTAGE_MV           (6000UL)
-#define BATTERY_UVP_VOLTAGE_MV             (6000UL)
+/* 欠压触发值为 13.5 V，锁存后须恢复到 15.5 V，避免停机回弹反复启停。 */
+#define BATTERY_UVP_VOLTAGE_MV             (13500UL)
+#define BATTERY_UVP_RECOVER_VOLTAGE_MV     (15500UL)
+
+/* 过压触发值为 24 V；低于此值并通过恢复滤波后解除过压保护。 */
+#define BATTERY_OVP_VOLTAGE_MV             (24000UL)
+
+/* 参考电钻 Volt_Handler 的独立计数滤波，以下计数均按 1 ms 任务节拍。 */
+#define BATTERY_UVP_FILTER_TIME_MS         (300U)
+#define BATTERY_OVP_FILTER_TIME_MS         (300U)
+
+/* 电压须连续满足恢复条件 300 ms 才解除锁存，不会自动启动电机。 */
+#define BATTERY_RECOVER_FILTER_TIME_MS     (300U)
 
 #endif /* __APP_CONFIG_H */

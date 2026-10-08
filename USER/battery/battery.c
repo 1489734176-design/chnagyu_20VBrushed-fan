@@ -2,77 +2,125 @@
 #include "config.h"
 #include "adc.h"
 
-/* 当前保存的电量百分比，功能关闭时不参与应用控制。 */
-static uint8_t battery_percent = 0U;
-
-/* 最近一次 VBus 换算结果，单位为毫伏。 */
+/* 最近一次 VBus 换算结果，单位为毫伏，不再计算电量百分比。 */
 static uint32_t battery_voltage_mv = 0UL;
 
-/* 欠压锁存状态，功能关闭时始终为 0。 */
+/* 欠压、过压分别锁存；任一保护未解除，都禁止电机启动。 */
 static uint8_t battery_under_voltage = 0U;
+static uint8_t battery_over_voltage = 0U;
+
+#if BATTERY_PROTECTION_ENABLE
+/* 每种保护独立计数：未锁存时累计异常，锁存后用作恢复倒计时。 */
+static uint16_t battery_uvp_count = 0U;
+static uint16_t battery_ovp_count = 0U;
 
 /*
- * @brief 初始化电量管理变量。
- * @note 电量管理关闭时不读取 ADC，也不触发欠压动作。
+ * @brief 更新一路电压保护的计数和锁存状态。
+ * @note 参考电钻 Volt_Handler：异常采样递增，正常采样递减，达到上限触发。
+ *       已触发后，必须连续满足恢复条件才解除；中途不满足则重置恢复倒计时。
+ *       每 1 ms 调用一次，计数饱和处理，避免长时间异常导致溢出。
+ */
+static void Battery_UpdateProtection(uint8_t fault, uint8_t recovered,
+                                     uint16_t filter_ms, uint16_t *count,
+                                     uint8_t *active)
+{
+    if (*active != 0U)
+    {
+        if (recovered != 0U)
+        {
+            if (*count > 0U)
+            {
+                (*count)--;
+            }
+            if (*count == 0U)
+            {
+                *active = 0U;
+            }
+        }
+        else
+        {
+            *count = BATTERY_RECOVER_FILTER_TIME_MS;
+        }
+    }
+    else if (fault != 0U)
+    {
+        if (*count < filter_ms)
+        {
+            (*count)++;
+        }
+        if (*count >= filter_ms)
+        {
+            *active = 1U;
+            *count = BATTERY_RECOVER_FILTER_TIME_MS;
+        }
+    }
+    else if (*count > 0U)
+    {
+        (*count)--;
+    }
+}
+#endif
+
+/*
+ * @brief 初始化电池电压保护。
+ * @note 必须在 AppAdc_Init 后调用。参考电钻 Volt_Handler_fast，上电立即检查，
+ *       不让零初值参与平均滤波，避免正常电池被误判为欠压。
  */
 void Battery_Init(void)
 {
-    battery_percent = 0U;
     battery_voltage_mv = 0UL;
     battery_under_voltage = 0U;
-}
-
-#if BATTERY_MANAGEMENT_ENABLE
-/*
- * @brief 根据 VBus 电压线性计算一个基础电量百分比。
- * @param voltage_mv VBus 毫伏值。
- * @return 0~100 的电量百分比。
- * @note 真正产品版本应根据电芯放电曲线替换为标定表。
- */
-static uint8_t Battery_ConvertPercent(uint32_t voltage_mv)
-{
-    uint32_t percent;
-
-    if (voltage_mv <= BATTERY_EMPTY_VOLTAGE_MV)
-    {
-        return 0U;
-    }
-    if (voltage_mv >= BATTERY_FULL_VOLTAGE_MV)
-    {
-        return 100U;
-    }
-
-    percent = (voltage_mv - BATTERY_EMPTY_VOLTAGE_MV) * 100UL;
-    percent /= (BATTERY_FULL_VOLTAGE_MV - BATTERY_EMPTY_VOLTAGE_MV);
-    return (uint8_t)percent;
-}
+    battery_over_voltage = 0U;
+#if BATTERY_PROTECTION_ENABLE
+    battery_uvp_count = 0U;
+    battery_ovp_count = 0U;
 #endif
+    (void)Battery_CheckBeforeStart();
+}
 
 /*
- * @brief 执行电量采样和简单滤波。
- * @note BATTERY_MANAGEMENT_ENABLE=0 时保留代码但整个任务为空操作。
+ * @brief 启动前重新采样，快速阻止异常电压下的电机启动。
+ * @return 1=允许启动，0=仍有欠压或过压保护。
+ * @note 这里只置位故障，绝不清除已有锁存；恢复只能由周期任务确认。
+ */
+uint8_t Battery_CheckBeforeStart(void)
+{
+#if BATTERY_PROTECTION_ENABLE
+    battery_voltage_mv = AppAdc_ReadVbusMv();
+    if (battery_voltage_mv <= BATTERY_UVP_VOLTAGE_MV)
+    {
+        battery_under_voltage = 1U;
+        battery_uvp_count = BATTERY_RECOVER_FILTER_TIME_MS;
+    }
+    if (battery_voltage_mv >= BATTERY_OVP_VOLTAGE_MV)
+    {
+        battery_over_voltage = 1U;
+        battery_ovp_count = BATTERY_RECOVER_FILTER_TIME_MS;
+    }
+#endif
+    return (Battery_IsProtected() == 0U) ? 1U : 0U;
+}
+
+/*
+ * @brief 每 1 ms 执行一次欠压/过压检测及恢复滤波。
+ * @note 欠压恢复使用 15.5 V 迟滞；过压恢复沿用参考工程的低于过压阈值判断。
+ *       本模块只提供保护状态，实际电机停机由应用层统一执行。
  */
 void Battery_Task(void)
 {
-#if BATTERY_MANAGEMENT_ENABLE
-    uint32_t new_voltage_mv;
-    uint8_t new_percent;
-
-    /* 读取 VBus，VBus 的分压倍率由 ADC 模块统一处理。 */
-    new_voltage_mv = AppAdc_ReadVbusMv();
-    battery_voltage_mv = (battery_voltage_mv * 3UL + new_voltage_mv) / 4UL;
-    new_percent = Battery_ConvertPercent(battery_voltage_mv);
-    battery_percent = (uint8_t)(((uint16_t)battery_percent * 3U + new_percent) / 4U);
-    battery_under_voltage = (battery_voltage_mv <= BATTERY_UVP_VOLTAGE_MV) ? 1U : 0U;
+#if BATTERY_PROTECTION_ENABLE
+    battery_voltage_mv = AppAdc_ReadVbusMv();
+    Battery_UpdateProtection(
+        (battery_voltage_mv <= BATTERY_UVP_VOLTAGE_MV) ? 1U : 0U,
+        (battery_voltage_mv >= BATTERY_UVP_RECOVER_VOLTAGE_MV) ? 1U : 0U,
+        BATTERY_UVP_FILTER_TIME_MS, &battery_uvp_count, &battery_under_voltage);
+    Battery_UpdateProtection(
+        (battery_voltage_mv >= BATTERY_OVP_VOLTAGE_MV) ? 1U : 0U,
+        (battery_voltage_mv < BATTERY_OVP_VOLTAGE_MV) ? 1U : 0U,
+        BATTERY_OVP_FILTER_TIME_MS, &battery_ovp_count, &battery_over_voltage);
 #else
-    /* 功能关闭期间不采样、不改变应用状态，也不控制电机。 */
+    /* 功能关闭时不采样，欠压/过压状态保持为 0。 */
 #endif
-}
-
-/* @brief 返回最近一次电量百分比。 */
-uint8_t Battery_GetPercent(void)
-{
-    return battery_percent;
 }
 
 /* @brief 返回最近一次 VBus 电压，单位为毫伏。 */
@@ -81,8 +129,20 @@ uint32_t Battery_GetVoltageMv(void)
     return battery_voltage_mv;
 }
 
-/* @brief 返回欠压状态。 */
+/* @brief 返回欠压锁存状态。 */
 uint8_t Battery_IsUnderVoltage(void)
 {
     return battery_under_voltage;
+}
+
+/* @brief 返回过压锁存状态。 */
+uint8_t Battery_IsOverVoltage(void)
+{
+    return battery_over_voltage;
+}
+
+/* @brief 返回汇总电压保护状态。 */
+uint8_t Battery_IsProtected(void)
+{
+    return ((battery_under_voltage != 0U) || (battery_over_voltage != 0U)) ? 1U : 0U;
 }

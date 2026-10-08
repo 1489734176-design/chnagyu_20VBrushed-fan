@@ -1,7 +1,6 @@
 #include "charge.h"
 #include "config.h"
 #include "adc.h"
-#include "battery.h"
 #include "power.h"
 
 /* 当前是否检测到充电输入。 */
@@ -51,15 +50,11 @@ void Charge_Task(void)
     charge_voltage_mv = AppAdc_ReadChargeInputMv();
     charge_input_present = (charge_voltage_mv >= CHARGE_INPUT_PRESENT_MV) ? 1U : 0U;
 
-    /* 只有检测到输入且电量未满时才允许打开通路。 */
-    if ((charge_input_present != 0U) && (Battery_GetPercent() < 100U))
-    {
-        Charge_SetEnable(1U);
-    }
-    else
-    {
-        Charge_SetEnable(0U);
-    }
+    /*
+     * 电量功能已移除，尚无经验证的充满/充电终止策略，因此只检测输入。
+     * 24 V 是过压保护阈值，不能作为充满电压；不得据此自动打开 CH_EN。
+     */
+    Charge_SetEnable(0U);
 #else
     /* 关闭期间不读取 ADC，不自动打开 CH_EN。 */
 #endif
