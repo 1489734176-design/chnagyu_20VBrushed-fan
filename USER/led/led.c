@@ -70,6 +70,7 @@ void Led_Set(uint8_t led_id, uint8_t on)
  */
 void Led_SetMask(uint8_t led_mask)
 {
+	
     uint8_t led_id;
 
     for (led_id = 0U; led_id < 6U; led_id++)

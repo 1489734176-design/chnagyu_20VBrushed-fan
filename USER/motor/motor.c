@@ -94,7 +94,7 @@ void Motor_Init(void)
     oc_init.TIM_OutputNState = TIM_OutputNState_Enable;
     oc_init.TIM_Pulse = 0U;
     oc_init.TIM_OCPolarity = TIM_OCPolarity_High;
-    oc_init.TIM_OCNPolarity = TIM_OCNPolarity_Low;
+    oc_init.TIM_OCNPolarity = TIM_OCPolarity_Low;
     oc_init.TIM_OCIdleState = TIM_OCIdleState_Reset;
     oc_init.TIM_OCNIdleState = TIM_OCNIdleState_Reset;
     TIM_OC1Init(TIM1, &oc_init);
@@ -104,7 +104,7 @@ void Motor_Init(void)
     oc_init.TIM_OutputState = TIM_OutputState_Enable;
     oc_init.TIM_OutputNState = TIM_OutputNState_Disable;
     oc_init.TIM_Pulse = 0U;
-    oc_init.TIM_OCPolarity = TIM_OCPolarity_High;
+    oc_init.TIM_OCPolarity = TIM_OCPolarity_Low;
     TIM_OC3Init(TIM1, &oc_init);
     TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
 
