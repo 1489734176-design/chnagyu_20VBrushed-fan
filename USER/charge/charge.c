@@ -32,10 +32,18 @@ static void Charge_WriteOutput(uint8_t enable)
 static uint8_t Charge_IsAllowed(void)
 {
 #if CHARGE_MANAGEMENT_ENABLE && CHARGE_INPUT_DETECTION_ENABLE && BATTERY_PROTECTION_ENABLE
-    /* 启动快速采样也可能更新电压；按最新样本判断，回落后不锁存截止。 */
-    charge_voltage_stopped = ((Battery_IsSampleValid() != 0U) &&
-                              (Charge_IsInputAbsent() == 0U) &&
-                              (Battery_GetVoltageMv() >= CHARGE_STOP_VOLTAGE_MV)) ? 1U : 0U;
+    /* 快速启动采样也会更新电压；无效样本和拔插不能清除截止回差状态。 */
+    if (Battery_IsSampleValid() != 0U)
+    {
+        if (Battery_GetVoltageMv() >= CHARGE_STOP_VOLTAGE_MV)
+        {
+            charge_voltage_stopped = 1U;
+        }
+        else if (Battery_GetVoltageMv() < CHARGE_RESUME_VOLTAGE_MV)
+        {
+            charge_voltage_stopped = 0U;
+        }
+    }
     return ((charge_power_available != 0U) &&
             (charge_input_state == CHARGE_INPUT_PRESENT) &&
             (charge_input_sample_valid != 0U) &&

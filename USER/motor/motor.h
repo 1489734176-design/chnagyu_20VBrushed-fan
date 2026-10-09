@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* 风扇档位编号：开机默认 1 档，K1 在 1/2/3 档之间循环。 */
+/* 风扇档位编号：K1 在 1/2/3 档之间循环，开机档位由应用层恢复。 */
 #define MOTOR_FAN_GEAR_MIN                 (1U)
 #define MOTOR_FAN_GEAR_MAX                 (3U)
 

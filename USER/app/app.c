@@ -5,46 +5,113 @@
 #include "power.h"
 #include "battery.h"
 #include "charge.h"
+#include "hal_flash.h"
 
-/* 当前应用状态，复位后先停机等待 K3，异常电压则进入保护状态。 */
+/* Keil IROM 长度须为 0x3C00，将最后 1 KB 擦除页留给档位记录。 */
+#define APP_FAN_MEMORY_START_ADDR          (0x08003C00UL)
+#define APP_FAN_MEMORY_END_ADDR            (0x08004000UL)
+
+/* K3 上电直接启动，其他上电保持待机；异常电压进入保护状态。 */
 static app_state_t app_state = APP_STATE_OFF;
 
-/* 当前风扇档位，开机默认 1 档。 */
+/* 无有效记录时默认 1 档，正常开机沿用上次关机档位。 */
 static uint8_t fan_gear = MOTOR_FAN_GEAR_MIN;
+static uint8_t fan_saved_gear = MOTOR_FAN_GEAR_MIN;
+static uint32_t fan_memory_next_addr = APP_FAN_MEMORY_START_ADDR;
 
 /* 当前水泵档位，开机默认 0 档。 */
 static uint8_t pump_gear = MOTOR_PUMP_GEAR_MIN;
 
-/*
- * 上电时 K3 仍可能被按住，这一次按压的释放不能当作新的开关机指令。
- * 1 表示还需忽略一次 K3 事件（即上电那次按压的释放）。
- */
+/* 上电按压已用于启动，忽略其释放，避免刚开机又关机。 */
 static uint8_t app_ignore_first_k3 = 0U;
 
 /* 用户逻辑关机后只为外部输入保电；电源已释放时不反复执行关断。 */
 static uint8_t app_power_off_requested = 0U;
 static uint8_t app_power_released = 0U;
 
-/*
- * @brief 根据当前风扇和水泵档位刷新指示灯。
- * @note 风扇 1/2/3 档分别点亮 LED6/LED5/LED4；水泵 1/2/3 档分别点亮 LED3/LED2/LED1；
- *       水泵 0 档不点亮任何水泵灯。掩码 bit0~bit5 对应 LED1~LED6。
- */
+static void App_LoadFanGear(void)
+{
+    uint32_t address;
+    uint16_t record;
+    uint8_t gear;
+
+    fan_saved_gear = MOTOR_FAN_GEAR_MIN;
+    fan_memory_next_addr = APP_FAN_MEMORY_START_ADDR;
+    for (address = APP_FAN_MEMORY_START_ADDR; address < APP_FAN_MEMORY_END_ADDR; address += 2UL)
+    {
+        record = *(volatile const uint16_t *)address;
+        if (record != 0xFFFFU)
+        {
+            /* 跳过断电留下的不完整记录，避免再次编程已使用的半字。 */
+            fan_memory_next_addr = address + 2UL;
+            gear = (uint8_t)record;
+            if ((gear >= MOTOR_FAN_GEAR_MIN) && (gear <= MOTOR_FAN_GEAR_MAX) &&
+                ((uint8_t)(record >> 8) == (uint8_t)(gear ^ 0xFFU)))
+            {
+                fan_saved_gear = gear;
+            }
+        }
+    }
+    fan_gear = fan_saved_gear;
+}
+
+static void App_SaveFanGear(void)
+{
+    uint32_t primask;
+    uint16_t record;
+    FLASH_Status status = FLASH_COMPLETE;
+
+    if (fan_gear == fan_saved_gear)
+    {
+        return;
+    }
+
+    /* Flash 操作会暂停采样，先关充电；此时电机已停且 EN 尚未释放。 */
+    Charge_SetEnable(0U);
+    record = (uint16_t)((uint16_t)fan_gear | ((uint16_t)(fan_gear ^ 0xFFU) << 8));
+    primask = __get_PRIMASK();
+    __disable_irq();
+    FLASH_Unlock();
+    FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
+
+    /* 追加半字记录，整页写满后才擦除，减少 Flash 擦写次数。 */
+    if (fan_memory_next_addr >= APP_FAN_MEMORY_END_ADDR)
+    {
+        status = FLASH_ErasePage(APP_FAN_MEMORY_START_ADDR);
+        if (status == FLASH_COMPLETE)
+        {
+            fan_memory_next_addr = APP_FAN_MEMORY_START_ADDR;
+        }
+    }
+    if (status == FLASH_COMPLETE)
+    {
+        status = FLASH_ProgramHalfWord(fan_memory_next_addr, record);
+        if ((status == FLASH_COMPLETE) &&
+            (*(volatile const uint16_t *)fan_memory_next_addr == record))
+        {
+            fan_saved_gear = fan_gear;
+        }
+        fan_memory_next_addr += 2UL;
+    }
+
+    FLASH_Lock();
+    __set_PRIMASK(primask);
+}
+
 static void App_UpdateGearLeds(void)
 {
     uint8_t led_mask = 0U;
 
-    /* 风扇档位与指示灯一一对应，档位越高灯越靠前。 */
     switch (fan_gear)
     {
         case 1U:
             led_mask |= (uint8_t)(1U << LED_ID_6);
             break;
         case 2U:
-            led_mask |= (uint8_t)(1U << LED_ID_5);
+            led_mask |= (uint8_t)((1U << LED_ID_6) | (1U << LED_ID_5));
             break;
         case 3U:
-            led_mask |= (uint8_t)(1U << LED_ID_4);
+            led_mask |= (uint8_t)((1U << LED_ID_6) | (1U << LED_ID_5) | (1U << LED_ID_4));
             break;
         default:
             break;
@@ -94,11 +161,12 @@ static void App_UpdatePowerOff(void)
     }
 }
 
-/* 插电时仅停电机和灯，保留监测及符合条件的充电；截止判断仍按最新电压。 */
+/* 插电时停电机和灯，保存档位后保留监测及符合条件的充电。 */
 static void App_PowerOff(void)
 {
     Motor_StopAll();
     Led_AllOff();
+    App_SaveFanGear();
     app_state = APP_STATE_OFF;
     app_power_off_requested = 1U;
     app_power_released = 0U;
@@ -131,21 +199,15 @@ static void App_PowerOn(void)
         return;
     }
 
-    fan_gear = MOTOR_FAN_GEAR_MIN;
     pump_gear = MOTOR_PUMP_GEAR_MIN;
     Motor_SetFanGear(fan_gear);
     Motor_SetPumpGear(pump_gear);
     app_state = APP_STATE_ON;
 
-    /* 开机后立即按默认档位刷新指示灯。 */
     App_UpdateGearLeds();
 }
 
-/*
- * @brief 初始化应用，保持当前上电不自动启动电机的行为。
- * @note Power_Init 已接管 EN；main 中已经完成电池快速检查和充电初始化，
- *       这里不能再次初始化电池，否则会丢失已经锁存的保护状态。
- */
+/* Battery_Init 已完成，不能重新初始化并清除已有保护锁存。 */
 void App_Init(void)
 {
     Power_SetKeepAlive(1U);
@@ -155,13 +217,16 @@ void App_Init(void)
     Motor_StopAll();
     Led_AllOff();
     app_state = APP_STATE_OFF;
-    fan_gear = MOTOR_FAN_GEAR_MIN;
+    App_LoadFanGear();
     pump_gear = MOTOR_PUMP_GEAR_MIN;
 
-    /* 若上电时 K3 仍被按住，则忽略这一次按压的释放事件。 */
     app_ignore_first_k3 = (Key_IsPressed(KEY_EVENT_K3) != 0U) ? 1U : 0U;
 
-    if (Battery_IsProtected() != 0U)
+    if (app_ignore_first_k3 != 0U)
+    {
+        App_PowerOn();
+    }
+    else if (Battery_IsProtected() != 0U)
     {
         App_EnterProtection();
     }

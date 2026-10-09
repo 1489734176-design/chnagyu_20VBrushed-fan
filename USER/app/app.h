@@ -11,7 +11,7 @@ typedef enum
     APP_STATE_PROTECT = 2U
 } app_state_t;
 
-/* 初始化应用状态和默认档位。 */
+/* 恢复风扇档位；K3 按住上电时直接启动，其他上电保持待机。 */
 void App_Init(void);
 
 /* 每 1 ms 执行一次按键、电机档位和电源状态处理。 */

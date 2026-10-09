@@ -38,7 +38,7 @@ uint32_t Charge_GetInputVoltageMv(void);
 /* 通路的软件输出状态，不代表测得电池充电电流。 */
 uint8_t Charge_IsEnabled(void);
 
-/* 电压截止不是充满判定；有效电压低于截止值后清除，无需拔插充电器。 */
+/* 电压截止不是充满判定；达到 22.5 V 后须低于 22 V 才清除，无需拔插充电器。 */
 uint8_t Charge_IsVoltageStopped(void);
 
 #endif /* __CHARGE_H */

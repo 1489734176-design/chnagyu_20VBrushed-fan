@@ -24,12 +24,13 @@ int main(void)
 
     /* 最早接管 EN，避免新板因软件初始化耗时而掉电。 */
     Power_Init();
+    /* 尽早记录上电时的 K3 状态，后续初始化期间松手也保留开机请求。 */
+    Key_Init();
 
     /* 初始化所有安全输出和输入外设。 */
     Led_Init();
     Motor_Init();
     AppAdc_Init();
-    Key_Init();
     AppTimer_Init();
 
     /* ADC 已就绪，先快速检查电池欠压/过压，再初始化充电和产品状态机。 */
