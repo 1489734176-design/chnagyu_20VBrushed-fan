@@ -5,6 +5,8 @@
 #include "power.h"
 #include "battery.h"
 #include "charge.h"
+#include "adc.h"
+#include "config.h"
 #include "hal_flash.h"
 
 /* Keil IROM 长度须为 0x3C00，将最后 1 KB 擦除页留给档位记录。 */
@@ -28,6 +30,8 @@ static uint8_t app_ignore_first_k3 = 0U;
 /* 用户逻辑关机后只为外部输入保电；电源已释放时不反复执行关断。 */
 static uint8_t app_power_off_requested = 0U;
 static uint8_t app_power_released = 0U;
+static uint16_t fan_stall_count = 0U;
+static uint8_t app_motor_fault_shutdown = 0U;
 
 static void App_LoadFanGear(void)
 {
@@ -171,6 +175,49 @@ static void App_PowerOff(void)
     app_power_off_requested = 1U;
     app_power_released = 0U;
     App_UpdatePowerOff();
+    fan_stall_count = 0U;
+}
+
+static void App_CheckFanStall(void)
+{
+    uint32_t current_ma;
+    uint8_t sample_valid;
+
+    if ((app_state != APP_STATE_ON) || (Motor_GetFanGear() == 0U))
+    {
+        fan_stall_count = 0U;
+        return;
+    }
+
+    sample_valid = AppAdc_TryReadCurrentMa(&current_ma);
+    if (sample_valid != 0U)
+    {
+        if (current_ma <= FAN_STALL_CURRENT_MA)
+        {
+            fan_stall_count = 0U;
+            return;
+        }
+        if (fan_stall_count < FAN_STALL_FILTER_TIME_MS)
+        {
+            fan_stall_count++;
+        }
+        if (fan_stall_count < FAN_STALL_FILTER_TIME_MS)
+        {
+            return;
+        }
+    }
+
+    /* 采样故障同样关断；外部供电未掉电时禁止按键或充电逻辑重新保电。 */
+    app_motor_fault_shutdown = 1U;
+    Motor_StopAll();
+    Led_AllOff();
+    Charge_UpdateOutput(0U);
+    App_SaveFanGear();
+    app_state = APP_STATE_OFF;
+    app_power_off_requested = 1U;
+    app_power_released = 1U;
+    fan_stall_count = 0U;
+    Power_SafePowerOff();
 }
 
 /*
@@ -182,6 +229,7 @@ static void App_EnterProtection(void)
     Motor_StopAll();
     Led_AllOff();
     app_state = APP_STATE_PROTECT;
+    fan_stall_count = 0U;
 }
 
 /*
@@ -190,6 +238,7 @@ static void App_EnterProtection(void)
  */
 static void App_PowerOn(void)
 {
+    fan_stall_count = 0U;
     app_power_off_requested = 0U;
     app_power_released = 0U;
     Power_SetKeepAlive(1U);
@@ -210,6 +259,8 @@ static void App_PowerOn(void)
 /* Battery_Init 已完成，不能重新初始化并清除已有保护锁存。 */
 void App_Init(void)
 {
+    fan_stall_count = 0U;
+    app_motor_fault_shutdown = 0U;
     Power_SetKeepAlive(1U);
     Charge_UpdateOutput(0U);
     app_power_off_requested = 0U;
@@ -240,9 +291,19 @@ static void App_ProcessTask(void)
 {
     uint8_t key_events;
 
+    if (app_motor_fault_shutdown != 0U)
+    {
+        return;
+    }
+
     /* 先检测电压，再处理按键，防止保护触发当拍仍调整电机输出。 */
     Battery_Task();
     Charge_Task();
+    App_CheckFanStall();
+    if (app_motor_fault_shutdown != 0U)
+    {
+        return;
+    }
     key_events = Key_Scan();
 
     if (((key_events & KEY_EVENT_K3) != 0U) && (app_ignore_first_k3 != 0U))

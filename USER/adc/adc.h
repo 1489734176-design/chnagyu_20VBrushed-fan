@@ -16,6 +16,9 @@ uint8_t AppAdc_TryReadRaw(uint8_t channel, uint16_t *raw);
 uint8_t AppAdc_TryReadVbusMv(uint32_t *voltage_mv);
 uint8_t AppAdc_TryReadChargeInputMv(uint32_t *voltage_mv);
 
+/* 公共电机电流采样：1=成功写入毫安值，0=失败且不改输出。 */
+uint8_t AppAdc_TryReadCurrentMa(uint32_t *current_ma);
+
 /* 兼容接口，失败返回 0；不可用于需要区分采样故障的安全决策。 */
 uint16_t AppAdc_ReadRaw(uint8_t channel);
 

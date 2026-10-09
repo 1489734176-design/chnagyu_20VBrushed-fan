@@ -61,3 +61,5 @@
 .\objects\app.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h
 .\objects\app.o: ..\USER\battery\battery.h
 .\objects\app.o: ..\USER\charge\charge.h
+.\objects\app.o: ..\USER\adc\adc.h
+.\objects\app.o: ..\USER\config\config.h

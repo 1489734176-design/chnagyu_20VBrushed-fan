@@ -140,18 +140,28 @@ uint32_t AppAdc_ReadChargeInputMv(void)
                           CHARGE_INPUT_DIVIDER_RATIO);
 }
 
-/*
- * @brief 读取公共电机回流电流。
- * @return 按 R18=5 mΩ 计算的毫安值。
- * @note 当前仅提供换算接口，未启用任何未经标定的过流保护。
- */
+uint8_t AppAdc_TryReadCurrentMa(uint32_t *current_ma)
+{
+    uint16_t raw;
+    uint32_t scaled_current;
+
+    if ((current_ma == 0) ||
+        (AppAdc_TryReadRaw(ADC_CHANNEL_CURRENT_SENSE, &raw) == 0U))
+    {
+        return 0U;
+    }
+
+    /* 5 mΩ/5 V 下最大乘积为 4095000000；避免先截断毫伏丢失电流精度。 */
+    scaled_current = (uint32_t)raw * APP_ADC_VREF_MV *
+                     (1000000UL / MOTOR_SHUNT_MICRO_OHM);
+    *current_ma = scaled_current / APP_ADC_FULL_SCALE;
+    return 1U;
+}
+
 uint32_t AppAdc_ReadCurrentMa(void)
 {
-    uint32_t sense_mv;
-    uint32_t current_ma;
+    uint32_t current_ma = 0UL;
 
-    sense_mv = AppAdc_RawToMv(AppAdc_ReadRaw(ADC_CHANNEL_CURRENT_SENSE), 1UL);
-    current_ma = sense_mv * 1000UL;
-    current_ma /= (MOTOR_SHUNT_MICRO_OHM / 1000UL);
+    (void)AppAdc_TryReadCurrentMa(&current_ma);
     return current_ma;
 }

@@ -52,6 +52,9 @@
 /* 电流采样电阻为 5 mΩ，单位使用微欧以避免浮点数。 */
 #define MOTOR_SHUNT_MICRO_OHM              (5000UL)
 
+#define FAN_STALL_CURRENT_MA               (1000UL)
+#define FAN_STALL_FILTER_TIME_MS           (500U)
+
 /* 按键去抖时间，主任务按 TIM14 产生的 1 ms 节拍调用。 */
 #define KEY_DEBOUNCE_TIME_MS               (20U)
 
