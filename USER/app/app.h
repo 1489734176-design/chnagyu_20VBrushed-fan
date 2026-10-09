@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* 应用状态：OFF 等待开机，ON 正常工作，PROTECT 停机并等待电压恢复。 */
+/* OFF 为电机逻辑关机；插电或输入未确认时可继续保电监测，ON 工作，PROTECT 停机。 */
 typedef enum
 {
     APP_STATE_OFF = 0U,

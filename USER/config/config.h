@@ -15,14 +15,32 @@
 /* 电池电压保护开关：0=关闭保护，1=启用欠压/过压保护，不计算或显示电量。 */
 #define BATTERY_PROTECTION_ENABLE          (1U)
 
-/* 充电管理开关：0=禁止检测和 CH_EN，1=允许检测/显式控制；自动充电策略尚未启用。 */
-#define CHARGE_MANAGEMENT_ENABLE           (0U)
+/* 适配器输入检测独立于充电使能：可以检测插拔，但不代表允许充电。 */
+#define CHARGE_INPUT_DETECTION_ENABLE      (1U)
+
+/* 硬件适配器负责恒流，软件启用通路并在 VBus 达到截止电压后锁存关闭。 */
+#define CHARGE_MANAGEMENT_ENABLE           (1U)
+#define CHARGE_STOP_VOLTAGE_MV             (20000UL)
+
+/* 外部供电存在检测初值，兼容恒流时输出降压；须实测最低输出并校准。 */
+#define CHARGE_INPUT_INSERT_MV             (18500UL)
+#define CHARGE_INPUT_REMOVE_MV             (18000UL)
+#define CHARGE_INPUT_FILTER_TICKS          (100U)
+
+/* 硬件充电电流目标，软件不设置/限制电流，也不使用电机 I_SENSE 控制充电。 */
+#define CHARGE_TARGET_CURRENT_MA           (4000UL)
 
 /* ADC 参考电压，实际值应在新芯片资料和实测后校准。 */
 #define APP_ADC_VREF_MV                    (5000UL)
 
 /* ADC 满量程计数，当前配置为 12 位。 */
 #define APP_ADC_FULL_SCALE                 (4095UL)
+
+/* ADC EOC 最大轮询次数（不是毫秒），实际最坏耗时须在板上测量。 */
+#define APP_ADC_EOC_POLL_LIMIT             (1024UL)
+
+/* ADC 故障后须连续有效采样才解除；按实际服务任务次数计数。 */
+#define BATTERY_ADC_RECOVER_TICKS          (300U)
 
 /* VBus 分压倍率：10 kΩ 上臂、1 kΩ 下臂，电阻网络倍率为 11。 */
 #define VBUS_DIVIDER_RATIO                 (11UL)

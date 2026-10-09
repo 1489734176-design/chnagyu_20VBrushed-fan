@@ -37,18 +37,18 @@ void Power_SetKeepAlive(uint8_t enable)
     }
     else
     {
-        GPIO_ResetBits(GPIOA, POWER_EN_PIN);
+        GPIO_ResetBits(GPIOA, POWER_EN_PIN);                                                                          
     }
 }
 
 /*
  * @brief 设置充电通路使能状态。
  * @param enable 1 表示请求打开充电，0 表示禁止充电。
- * @note 充电功能关闭期间无论调用参数如何都保持 CH_EN 为低。
+ * @note 任一充电/检测/电池保护功能关闭时都保持低；正常运行仅由 charge 模块调用。
  */
 void Power_SetChargeEnable(uint8_t enable)
 {
-#if CHARGE_MANAGEMENT_ENABLE
+#if CHARGE_MANAGEMENT_ENABLE && CHARGE_INPUT_DETECTION_ENABLE && BATTERY_PROTECTION_ENABLE
     if (enable != 0U)
     {
         GPIO_SetBits(GPIOA, POWER_CHARGE_ENABLE_PIN);

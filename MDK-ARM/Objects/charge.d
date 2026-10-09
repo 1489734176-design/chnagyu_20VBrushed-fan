@@ -58,3 +58,4 @@
 .\objects\charge.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_tim.h
 .\objects\charge.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_usart.h
 .\objects\charge.o: ..\Device\MM32G0001\HAL_Lib\inc\hal_uid.h
+.\objects\charge.o: ..\USER\battery\battery.h

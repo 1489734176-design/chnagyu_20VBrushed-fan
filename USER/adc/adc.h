@@ -11,7 +11,12 @@
 /* 初始化三路模拟输入和 ADC1。 */
 void AppAdc_Init(void);
 
-/* 读取指定 ADC 通道的 12 位原始计数。 */
+/* 有界采样：1=成功并写入输出，0=失败且保留输出原值，真实 0 V 不代表失败。 */
+uint8_t AppAdc_TryReadRaw(uint8_t channel, uint16_t *raw);
+uint8_t AppAdc_TryReadVbusMv(uint32_t *voltage_mv);
+uint8_t AppAdc_TryReadChargeInputMv(uint32_t *voltage_mv);
+
+/* 兼容接口，失败返回 0；不可用于需要区分采样故障的安全决策。 */
 uint16_t AppAdc_ReadRaw(uint8_t channel);
 
 /* 读取 VBus，返回按 11 倍分压换算后的毫伏值。 */

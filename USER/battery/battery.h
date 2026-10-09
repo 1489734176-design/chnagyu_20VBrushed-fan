@@ -21,7 +21,11 @@ uint8_t Battery_IsUnderVoltage(void);
 /* 返回过压保护状态，1=过压锁存，0=正常。 */
 uint8_t Battery_IsOverVoltage(void);
 
-/* 任意电压保护仍未解除时返回 1。 */
+/* 电压或 ADC 故障仍未解除时返回 1。 */
 uint8_t Battery_IsProtected(void);
+
+/* 电压查询保留最近有效值，使用前应核对采样有效性及故障锁存。 */
+uint8_t Battery_IsSampleValid(void);
+uint8_t Battery_IsAdcFault(void);
 
 #endif /* __BATTERY_H */

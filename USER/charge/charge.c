@@ -2,72 +2,185 @@
 #include "config.h"
 #include "adc.h"
 #include "power.h"
+#include "battery.h"
 
-/* 当前是否检测到充电输入。 */
-static uint8_t charge_input_present = 0U;
-
-/* 当前软件是否请求打开充电通路。 */
+static charge_input_state_t charge_input_state = CHARGE_INPUT_UNKNOWN;
+static uint8_t charge_input_sample_valid = 0U;
+static uint32_t charge_input_voltage_mv = 0UL;
 static uint8_t charge_enabled = 0U;
+static uint8_t charge_voltage_stopped = 0U;
+#if CHARGE_MANAGEMENT_ENABLE && CHARGE_INPUT_DETECTION_ENABLE && BATTERY_PROTECTION_ENABLE
+static uint8_t charge_power_available = 0U;
+#endif
 
-/*
- * @brief 初始化充电管理状态。
- * @note 无论宏开关状态如何，上电都先关闭 CH_EN。
- */
+#if CHARGE_INPUT_DETECTION_ENABLE
+/* 连续确认计数，门限之间保留已确认状态，启动/故障后需重新确认。 */
+static uint16_t charge_insert_count = 0U;
+static uint16_t charge_remove_count = 0U;
+#endif
+
+/* 只在输出变化时写 GPIO，避免正常充电每拍先低后高。 */
+static void Charge_WriteOutput(uint8_t enable)
+{
+    if (charge_enabled != enable)
+    {
+        Power_SetChargeEnable(enable);
+        charge_enabled = enable;
+    }
+}
+
+static uint8_t Charge_IsAllowed(void)
+{
+#if CHARGE_MANAGEMENT_ENABLE && CHARGE_INPUT_DETECTION_ENABLE && BATTERY_PROTECTION_ENABLE
+    /* 启动快速采样也可能更新电压，周期末必须再次检查并锁存。 */
+    if ((Battery_IsSampleValid() != 0U) && (Charge_IsInputAbsent() == 0U) &&
+        (Battery_GetVoltageMv() >= CHARGE_STOP_VOLTAGE_MV))
+    {
+        charge_voltage_stopped = 1U;
+    }
+    return ((charge_power_available != 0U) &&
+            (charge_input_state == CHARGE_INPUT_PRESENT) &&
+            (charge_input_sample_valid != 0U) &&
+            (charge_input_voltage_mv > CHARGE_INPUT_REMOVE_MV) &&
+            (Battery_IsSampleValid() != 0U) && (Battery_IsAdcFault() == 0U) &&
+            (Battery_IsOverVoltage() == 0U) &&
+            (charge_voltage_stopped == 0U)) ? 1U : 0U;
+#else
+    return 0U;
+#endif
+}
+
 void Charge_Init(void)
 {
-    charge_input_present = 0U;
+#if CHARGE_INPUT_DETECTION_ENABLE
+    charge_input_state = CHARGE_INPUT_UNKNOWN;
+    charge_insert_count = 0U;
+    charge_remove_count = 0U;
+#else
+    charge_input_state = CHARGE_INPUT_DISABLED;
+#endif
+    charge_input_sample_valid = 0U;
+    charge_input_voltage_mv = 0UL;
     charge_enabled = 0U;
+    charge_voltage_stopped = 0U;
+#if CHARGE_MANAGEMENT_ENABLE && CHARGE_INPUT_DETECTION_ENABLE && BATTERY_PROTECTION_ENABLE
+    charge_power_available = 0U;
+#endif
     Power_SetChargeEnable(0U);
 }
 
-/*
- * @brief 请求设置充电通路。
- * @param enable 1=请求打开，0=关闭。
- * @note CHARGE_MANAGEMENT_ENABLE=0 时只记录关闭状态并保持硬件低电平。
- */
 void Charge_SetEnable(uint8_t enable)
 {
-#if CHARGE_MANAGEMENT_ENABLE
-    charge_enabled = (enable != 0U) ? 1U : 0U;
-    Power_SetChargeEnable(charge_enabled);
-#else
-    (void)enable;
-    charge_enabled = 0U;
-    Power_SetChargeEnable(0U);
-#endif
+    if (enable == 0U)
+    {
+        Charge_WriteOutput(0U);
+    }
+    else
+    {
+        Charge_WriteOutput(Charge_IsAllowed());
+    }
 }
 
-/*
- * @brief 执行充电输入检测和充电通路控制。
- * @note 当前宏关闭，代码保留供后续按电池和充电器规格启用。
- */
+/* 只在应用完成启动检查和电源决策后，才允许由关闭切换为打开。 */
+void Charge_UpdateOutput(uint8_t power_available)
+{
+#if CHARGE_MANAGEMENT_ENABLE && CHARGE_INPUT_DETECTION_ENABLE && BATTERY_PROTECTION_ENABLE
+    charge_power_available = (power_available != 0U) ? 1U : 0U;
+#else
+    (void)power_available;
+#endif
+    Charge_SetEnable(1U);
+}
+
 void Charge_Task(void)
 {
-#if CHARGE_MANAGEMENT_ENABLE
-    uint32_t charge_voltage_mv;
+#if CHARGE_INPUT_DETECTION_ENABLE
+    if (AppAdc_TryReadChargeInputMv(&charge_input_voltage_mv) == 0U)
+    {
+        charge_input_sample_valid = 0U;
+        charge_input_state = CHARGE_INPUT_FAULT;
+        charge_insert_count = 0U;
+        charge_remove_count = 0U;
+        Charge_SetEnable(0U);
+        return;
+    }
+    charge_input_sample_valid = 1U;
 
-    /* CH_VIN 由 ADC 模块按 11 倍分压换算。 */
-    charge_voltage_mv = AppAdc_ReadChargeInputMv();
-    charge_input_present = (charge_voltage_mv >= CHARGE_INPUT_PRESENT_MV) ? 1U : 0U;
+    if (charge_input_voltage_mv >= CHARGE_INPUT_INSERT_MV)
+    {
+        charge_remove_count = 0U;
+        if (charge_insert_count < CHARGE_INPUT_FILTER_TICKS)
+        {
+            charge_insert_count++;
+        }
+        if (charge_insert_count >= CHARGE_INPUT_FILTER_TICKS)
+        {
+            charge_input_state = CHARGE_INPUT_PRESENT;
+        }
+    }
+    else if (charge_input_voltage_mv <= CHARGE_INPUT_REMOVE_MV)
+    {
+        charge_insert_count = 0U;
+        if (charge_remove_count < CHARGE_INPUT_FILTER_TICKS)
+        {
+            charge_remove_count++;
+        }
+        if (charge_remove_count >= CHARGE_INPUT_FILTER_TICKS)
+        {
+            charge_input_state = CHARGE_INPUT_ABSENT;
+            charge_voltage_stopped = 0U;
+        }
+    }
+    else
+    {
+        charge_insert_count = 0U;
+        charge_remove_count = 0U;
+    }
+#endif
+    /* 低输入/无效样本/截止立即关断，不等待按键处理，更不先开再检查。 */
+    if (Charge_IsAllowed() == 0U)
+    {
+        Charge_SetEnable(0U);
+    }
+}
 
-    /*
-     * 电量功能已移除，尚无经验证的充满/充电终止策略，因此只检测输入。
-     * 24 V 是过压保护阈值，不能作为充满电压；不得据此自动打开 CH_EN。
-     */
-    Charge_SetEnable(0U);
+charge_input_state_t Charge_GetInputState(void)
+{
+    return charge_input_state;
+}
+
+uint8_t Charge_IsInputPresent(void)
+{
+    return (charge_input_state == CHARGE_INPUT_PRESENT) ? 1U : 0U;
+}
+
+uint8_t Charge_IsInputAbsent(void)
+{
+#if CHARGE_INPUT_DETECTION_ENABLE
+    return ((charge_input_state == CHARGE_INPUT_ABSENT) &&
+            (charge_input_sample_valid != 0U) &&
+            (charge_remove_count >= CHARGE_INPUT_FILTER_TICKS)) ? 1U : 0U;
 #else
-    /* 关闭期间不读取 ADC，不自动打开 CH_EN。 */
+    return 0U;
 #endif
 }
 
-/* @brief 返回当前是否检测到充电输入。 */
-uint8_t Charge_IsInputPresent(void)
+uint8_t Charge_IsInputSampleValid(void)
 {
-    return charge_input_present;
+    return charge_input_sample_valid;
 }
 
-/* @brief 返回当前软件是否允许充电。 */
+uint32_t Charge_GetInputVoltageMv(void)
+{
+    return charge_input_voltage_mv;
+}
+
 uint8_t Charge_IsEnabled(void)
 {
     return charge_enabled;
+}
+
+uint8_t Charge_IsVoltageStopped(void)
+{
+    return charge_voltage_stopped;
 }

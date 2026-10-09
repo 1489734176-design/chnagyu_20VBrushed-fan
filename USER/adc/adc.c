@@ -41,29 +41,48 @@ void AppAdc_Init(void)
 }
 
 /*
- * @brief 读取一个 ADC 通道的原始值。
- * @param channel ADC 通道号，例如 ADC_Channel_0、ADC_Channel_1、ADC_Channel_5。
- * @return 12 位 ADC 原始计数。
+ * @brief 有界读取 ADC，成功返回 1 并写入 raw，失败返回 0 且不改输出值。
+ * @note 超时停止转换并清理标志，避免永久阻塞；只在前台串行调用。
  */
-uint16_t AppAdc_ReadRaw(uint8_t channel)
+uint8_t AppAdc_TryReadRaw(uint8_t channel, uint16_t *raw)
 {
-    uint16_t value;
+    uint32_t polls;
+    uint8_t success = 0U;
 
-    /* 使用芯片自带的任意通道单次转换接口。 */
+    if (raw == 0)
+    {
+        return 0U;
+    }
+
+    ADC_SoftwareStartConvCmd(ADC1, DISABLE);
     ADC_AnyChannelNumCfg(ADC1, 0U);
     ADC_AnyChannelSelect(ADC1, ADC_AnyChannel_0, channel);
     ADC_AnyChannelCmd(ADC1, ENABLE);
     ADC_ClearFlag(ADC1, ADC_FLAG_EOC);
     ADC_SoftwareStartConvCmd(ADC1, ENABLE);
 
-    /* 等待本次转换结束，前台调用频率低，不在中断中使用此函数。 */
-    while (RESET == ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC))
+    for (polls = 0UL; polls < APP_ADC_EOC_POLL_LIMIT; polls++)
     {
+        if (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) != RESET)
+        {
+            *raw = ADC_GetConversionValue(ADC1);
+            success = 1U;
+            break;
+        }
     }
 
-    value = ADC_GetConversionValue(ADC1);
-    ADC_ClearFlag(ADC1, ADC_FLAG_EOC);
+    ADC_SoftwareStartConvCmd(ADC1, DISABLE);
     ADC_AnyChannelCmd(ADC1, DISABLE);
+    ADC_ClearFlag(ADC1, ADC_FLAG_EOC);
+    return success;
+}
+
+/* 兼容旧接口：失败返回 0，安全决策必须使用带成功标志的 TryRead 接口。 */
+uint16_t AppAdc_ReadRaw(uint8_t channel)
+{
+    uint16_t value = 0U;
+
+    (void)AppAdc_TryReadRaw(channel, &value);
     return value;
 }
 
@@ -77,10 +96,34 @@ static uint32_t AppAdc_RawToMv(uint16_t raw, uint32_t divider_ratio)
 {
     uint32_t voltage_mv;
 
-    voltage_mv = (uint32_t)raw * APP_ADC_VREF_MV;
+    /* 当前参数最大乘积为 4095 * 5000 * 11，32 位可容纳；最后再除减少截断。 */
+    voltage_mv = (uint32_t)raw * APP_ADC_VREF_MV * divider_ratio;
     voltage_mv /= APP_ADC_FULL_SCALE;
-    voltage_mv *= divider_ratio;
     return voltage_mv;
+}
+
+static uint8_t AppAdc_TryReadMv(uint8_t channel, uint32_t divider_ratio,
+                               uint32_t *voltage_mv)
+{
+    uint16_t raw;
+
+    if ((voltage_mv == 0) || (AppAdc_TryReadRaw(channel, &raw) == 0U))
+    {
+        return 0U;
+    }
+    *voltage_mv = AppAdc_RawToMv(raw, divider_ratio);
+    return 1U;
+}
+
+uint8_t AppAdc_TryReadVbusMv(uint32_t *voltage_mv)
+{
+    return AppAdc_TryReadMv(ADC_CHANNEL_VBUS, VBUS_DIVIDER_RATIO, voltage_mv);
+}
+
+uint8_t AppAdc_TryReadChargeInputMv(uint32_t *voltage_mv)
+{
+    return AppAdc_TryReadMv(ADC_CHANNEL_CHARGE_INPUT,
+                          CHARGE_INPUT_DIVIDER_RATIO, voltage_mv);
 }
 
 /* @brief 读取 VBus 外部电压，分压倍率为 11。 */

@@ -9,7 +9,12 @@ static uint32_t battery_voltage_mv = 0UL;
 static uint8_t battery_under_voltage = 0U;
 static uint8_t battery_over_voltage = 0U;
 
+/* 无效样本不能用于电压判断，ADC 故障单独锁存并禁止电机。 */
+static uint8_t battery_sample_valid = 0U;
+static uint8_t battery_adc_fault = 0U;
+
 #if BATTERY_PROTECTION_ENABLE
+static uint16_t battery_adc_recover_count = 0U;
 /* 每种保护独立计数：未锁存时累计异常，锁存后用作恢复倒计时。 */
 static uint16_t battery_uvp_count = 0U;
 static uint16_t battery_ovp_count = 0U;
@@ -59,6 +64,28 @@ static void Battery_UpdateProtection(uint8_t fault, uint8_t recovered,
         (*count)--;
     }
 }
+
+/* 失败时保留最近有效电压，但禁止把它作为新样本或连续恢复证据。 */
+static uint8_t Battery_ReadVoltage(void)
+{
+    if (AppAdc_TryReadVbusMv(&battery_voltage_mv) == 0U)
+    {
+        battery_sample_valid = 0U;
+        battery_adc_fault = 1U;
+        battery_adc_recover_count = 0U;
+        if (battery_under_voltage != 0U)
+        {
+            battery_uvp_count = BATTERY_RECOVER_FILTER_TIME_MS;
+        }
+        if (battery_over_voltage != 0U)
+        {
+            battery_ovp_count = BATTERY_RECOVER_FILTER_TIME_MS;
+        }
+        return 0U;
+    }
+    battery_sample_valid = 1U;
+    return 1U;
+}
 #endif
 
 /*
@@ -71,7 +98,10 @@ void Battery_Init(void)
     battery_voltage_mv = 0UL;
     battery_under_voltage = 0U;
     battery_over_voltage = 0U;
+    battery_sample_valid = 0U;
+    battery_adc_fault = 0U;
 #if BATTERY_PROTECTION_ENABLE
+    battery_adc_recover_count = 0U;
     battery_uvp_count = 0U;
     battery_ovp_count = 0U;
 #endif
@@ -86,7 +116,10 @@ void Battery_Init(void)
 uint8_t Battery_CheckBeforeStart(void)
 {
 #if BATTERY_PROTECTION_ENABLE
-    battery_voltage_mv = AppAdc_ReadVbusMv();
+    if (Battery_ReadVoltage() == 0U)
+    {
+        return 0U;
+    }
     if (battery_voltage_mv <= BATTERY_UVP_VOLTAGE_MV)
     {
         battery_under_voltage = 1U;
@@ -109,7 +142,21 @@ uint8_t Battery_CheckBeforeStart(void)
 void Battery_Task(void)
 {
 #if BATTERY_PROTECTION_ENABLE
-    battery_voltage_mv = AppAdc_ReadVbusMv();
+    if (Battery_ReadVoltage() == 0U)
+    {
+        return;
+    }
+    if (battery_adc_fault != 0U)
+    {
+        if (battery_adc_recover_count < BATTERY_ADC_RECOVER_TICKS)
+        {
+            battery_adc_recover_count++;
+        }
+        if (battery_adc_recover_count >= BATTERY_ADC_RECOVER_TICKS)
+        {
+            battery_adc_fault = 0U;
+        }
+    }
     Battery_UpdateProtection(
         (battery_voltage_mv <= BATTERY_UVP_VOLTAGE_MV) ? 1U : 0U,
         (battery_voltage_mv >= BATTERY_UVP_RECOVER_VOLTAGE_MV) ? 1U : 0U,
@@ -144,5 +191,16 @@ uint8_t Battery_IsOverVoltage(void)
 /* @brief 返回汇总电压保护状态。 */
 uint8_t Battery_IsProtected(void)
 {
-    return ((battery_under_voltage != 0U) || (battery_over_voltage != 0U)) ? 1U : 0U;
+    return ((battery_under_voltage != 0U) || (battery_over_voltage != 0U) ||
+            (battery_adc_fault != 0U)) ? 1U : 0U;
+}
+
+uint8_t Battery_IsSampleValid(void)
+{
+    return battery_sample_valid;
+}
+
+uint8_t Battery_IsAdcFault(void)
+{
+    return battery_adc_fault;
 }

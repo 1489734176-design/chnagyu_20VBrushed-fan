@@ -21,6 +21,10 @@ static uint8_t pump_gear = MOTOR_PUMP_GEAR_MIN;
  */
 static uint8_t app_ignore_first_k3 = 0U;
 
+/* 用户逻辑关机后只为外部输入保电；电源已释放时不反复执行关断。 */
+static uint8_t app_power_off_requested = 0U;
+static uint8_t app_power_released = 0U;
+
 /*
  * @brief 根据当前风扇和水泵档位刷新指示灯。
  * @note 风扇 1/2/3 档分别点亮 LED6/LED5/LED4；水泵 1/2/3 档分别点亮 LED3/LED2/LED1；
@@ -66,26 +70,48 @@ static void App_UpdateGearLeds(void)
 }
 
 /*
- * @brief 执行应用关机流程。
- * @note 先停电机和 LED，再禁止充电，最后释放 EN，避免关机过程中仍有驱动输出。
+ * @brief 用户关机后，确认外部输入已拔出才释放电源。
+ * @note 未确认或 ADC 故障保持监测，不能把输入状态不可信当作拔出。
  */
+static void App_UpdatePowerOff(void)
+{
+    charge_input_state_t input_state = Charge_GetInputState();
+
+    if ((app_power_off_requested == 0U) || (app_power_released != 0U))
+    {
+        return;
+    }
+    if ((Charge_IsInputAbsent() != 0U) ||
+        (input_state == CHARGE_INPUT_DISABLED))
+    {
+        Charge_UpdateOutput(0U);
+        Power_SafePowerOff();
+        app_power_released = 1U;
+    }
+    else
+    {
+        Power_SetKeepAlive(1U);
+    }
+}
+
+/* 插电时仅停电机和灯，保留监测及符合条件的充电；不清除截止锁存。 */
 static void App_PowerOff(void)
 {
     Motor_StopAll();
-    Charge_SetEnable(0U);
     Led_AllOff();
     app_state = APP_STATE_OFF;
-    Power_SafePowerOff();
+    app_power_off_requested = 1U;
+    app_power_released = 0U;
+    App_UpdatePowerOff();
 }
 
 /*
  * @brief 电压保护停机，不释放 EN，以便继续采样并判断恢复条件。
- * @note 停止风扇、水泵和指示灯；用户仍可按 K3 真正关机。
+ * @note 停止风扇、水泵和指示灯；仅放电欠压不禁止充电，ADC/过压由充电模块阻断。
  */
 static void App_EnterProtection(void)
 {
     Motor_StopAll();
-    Charge_SetEnable(0U);
     Led_AllOff();
     app_state = APP_STATE_PROTECT;
 }
@@ -96,14 +122,15 @@ static void App_EnterProtection(void)
  */
 static void App_PowerOn(void)
 {
+    app_power_off_requested = 0U;
+    app_power_released = 0U;
+    Power_SetKeepAlive(1U);
     if (Battery_CheckBeforeStart() == 0U)
     {
         App_EnterProtection();
         return;
     }
 
-    Power_SetKeepAlive(1U);
-    Charge_SetEnable(0U);
     fan_gear = MOTOR_FAN_GEAR_MIN;
     pump_gear = MOTOR_PUMP_GEAR_MIN;
     Motor_SetFanGear(fan_gear);
@@ -121,8 +148,11 @@ static void App_PowerOn(void)
  */
 void App_Init(void)
 {
+    Power_SetKeepAlive(1U);
+    Charge_UpdateOutput(0U);
+    app_power_off_requested = 0U;
+    app_power_released = 0U;
     Motor_StopAll();
-    Charge_SetEnable(0U);
     Led_AllOff();
     app_state = APP_STATE_OFF;
     fan_gear = MOTOR_FAN_GEAR_MIN;
@@ -141,7 +171,7 @@ void App_Init(void)
  * @brief 处理一个 1 ms 应用周期。
  * @note 电压保护优先于档位控制；K3 可在运行或保护状态下关机。
  */
-void App_Task(void)
+static void App_ProcessTask(void)
 {
     uint8_t key_events;
 
@@ -155,6 +185,26 @@ void App_Task(void)
         /* 上电那次 K3 释放不作为新指令，但本周期仍须执行电压保护。 */
         app_ignore_first_k3 = 0U;
         key_events = 0U;
+    }
+
+    /* 用户关机优先于重新进入保护；监测继续，K3 仍可尝试开机。 */
+    if (app_power_off_requested != 0U)
+    {
+        /* 若硬件仍有供电，新一轮确认接入可重新保电，仍不自动启动电机。 */
+        if ((app_power_released != 0U) && (Charge_IsInputPresent() != 0U))
+        {
+            Power_SetKeepAlive(1U);
+            app_power_released = 0U;
+        }
+        if ((key_events & KEY_EVENT_K3) != 0U)
+        {
+            App_PowerOn();
+        }
+        else
+        {
+            App_UpdatePowerOff();
+        }
+        return;
     }
 
     if (Battery_IsProtected() != 0U)
@@ -214,6 +264,13 @@ void App_Task(void)
         Motor_SetPumpGear(pump_gear);
         App_UpdateGearLeds();
     }
+}
+
+/* 所有按键/保护分支结束后统一决策，快速启动采样的异常也在当拍关闭。 */
+void App_Task(void)
+{
+    App_ProcessTask();
+    Charge_UpdateOutput((app_power_released == 0U) ? 1U : 0U);
 }
 
 /* @brief 返回当前应用状态。 */
