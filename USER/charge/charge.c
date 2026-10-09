@@ -32,16 +32,14 @@ static void Charge_WriteOutput(uint8_t enable)
 static uint8_t Charge_IsAllowed(void)
 {
 #if CHARGE_MANAGEMENT_ENABLE && CHARGE_INPUT_DETECTION_ENABLE && BATTERY_PROTECTION_ENABLE
-    /* 启动快速采样也可能更新电压，周期末必须再次检查并锁存。 */
-    if ((Battery_IsSampleValid() != 0U) && (Charge_IsInputAbsent() == 0U) &&
-        (Battery_GetVoltageMv() >= CHARGE_STOP_VOLTAGE_MV))
-    {
-        charge_voltage_stopped = 1U;
-    }
+    /* 启动快速采样也可能更新电压；按最新样本判断，回落后不锁存截止。 */
+    charge_voltage_stopped = ((Battery_IsSampleValid() != 0U) &&
+                              (Charge_IsInputAbsent() == 0U) &&
+                              (Battery_GetVoltageMv() >= CHARGE_STOP_VOLTAGE_MV)) ? 1U : 0U;
     return ((charge_power_available != 0U) &&
             (charge_input_state == CHARGE_INPUT_PRESENT) &&
             (charge_input_sample_valid != 0U) &&
-            (charge_input_voltage_mv > CHARGE_INPUT_REMOVE_MV) &&
+            (charge_input_voltage_mv > CHARGE_INPUT_INSERT_MV) &&
             (Battery_IsSampleValid() != 0U) && (Battery_IsAdcFault() == 0U) &&
             (Battery_IsOverVoltage() == 0U) &&
             (charge_voltage_stopped == 0U)) ? 1U : 0U;
@@ -106,7 +104,7 @@ void Charge_Task(void)
     }
     charge_input_sample_valid = 1U;
 
-    if (charge_input_voltage_mv >= CHARGE_INPUT_INSERT_MV)
+    if (charge_input_voltage_mv > CHARGE_INPUT_INSERT_MV)
     {
         charge_remove_count = 0U;
         if (charge_insert_count < CHARGE_INPUT_FILTER_TICKS)
@@ -128,7 +126,6 @@ void Charge_Task(void)
         if (charge_remove_count >= CHARGE_INPUT_FILTER_TICKS)
         {
             charge_input_state = CHARGE_INPUT_ABSENT;
-            charge_voltage_stopped = 0U;
         }
     }
     else

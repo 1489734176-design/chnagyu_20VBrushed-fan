@@ -1,0 +1,54 @@
+Test workspace: C:\Users\mym02\AppData\Local\Temp\nx32-charge-22500-tests-owxeti2b
+
+BUILD/RUN INPUT_DETECTION=1 CHARGE=1 BATTERY=1
+NX32 actual-module tests on local Cortex-M0 model
+PASS ADC real zero, conversion precision, timeout, cleanup and recovery
+PASS battery ADC latch, continuous valid recovery, zero-V UVP and OVP
+PASS input thresholds, hysteresis, debounce, pending insertion and ADC fault
+PASS boot standby, K3 boot-release ignore, gear cycles and unplugged shutdown
+PASS adapter shutdown keeps EN; removal drops EN only when user-off
+PASS pending insertion, unknown/fault input and logical-off restart
+PASS battery ADC fault stops before gear change; recovery never restarts motors
+PASS shutdown while protected stays logically off and permits removal power-off
+PASS automatic path, stable GPIO, motor use and strict input eligibility
+PASS 22.5 V boundary, immediate cutoff and resume without unplugging
+PASS input below insertion threshold resets consecutive confirmation
+PASS voltage recovery cannot bypass latched ADC fault recovery
+PASS boot/reinsert at cutoff voltage never opens the path
+PASS CH_VIN/VBus ADC faults block immediately, continuous recovery cannot bypass cutoff
+PASS latched OVP independently blocks a new adapter session until voltage recovery
+PASS discharge UVP stops motors without prohibiting hardware-current-controlled charging
+PASS same-tick K3 fast ADC/cutoff checks do not emit an enable pulse
+ALL PASS: 156 assertions; charge safety/state verified
+
+BUILD/RUN INPUT_DETECTION=0 CHARGE=1 BATTERY=1
+NX32 actual-module tests on local Cortex-M0 model
+PASS ADC real zero, conversion precision, timeout, cleanup and recovery
+PASS battery ADC latch, continuous valid recovery, zero-V UVP and OVP
+PASS input detection disabled: no sampling and no charging
+PASS boot standby, K3 boot-release ignore, gear cycles and unplugged shutdown
+PASS detection-disabled K3 preserves immediate shutdown behavior
+PASS battery ADC fault stops before gear change; recovery never restarts motors
+PASS disabled feature combination fails closed
+ALL PASS: 59 assertions; charge safety/state verified
+
+BUILD/RUN INPUT_DETECTION=1 CHARGE=0 BATTERY=1
+NX32 actual-module tests on local Cortex-M0 model
+PASS ADC real zero, conversion precision, timeout, cleanup and recovery
+PASS battery ADC latch, continuous valid recovery, zero-V UVP and OVP
+PASS input thresholds, hysteresis, debounce, pending insertion and ADC fault
+PASS boot standby, K3 boot-release ignore, gear cycles and unplugged shutdown
+PASS adapter shutdown keeps EN; removal drops EN only when user-off
+PASS pending insertion, unknown/fault input and logical-off restart
+PASS battery ADC fault stops before gear change; recovery never restarts motors
+PASS shutdown while protected stays logically off and permits removal power-off
+PASS disabled feature combination fails closed
+ALL PASS: 92 assertions; charge safety/state verified
+
+BUILD/RUN INPUT_DETECTION=1 CHARGE=1 BATTERY=0
+NX32 actual-module tests on local Cortex-M0 model
+PASS ADC real zero, conversion precision, timeout, cleanup and recovery
+PASS disabled feature combination fails closed
+ALL PASS: 17 assertions; charge safety/state verified
+
+All four feature configurations passed.

@@ -94,7 +94,7 @@ static void App_UpdatePowerOff(void)
     }
 }
 
-/* 插电时仅停电机和灯，保留监测及符合条件的充电；不清除截止锁存。 */
+/* 插电时仅停电机和灯，保留监测及符合条件的充电；截止判断仍按最新电压。 */
 static void App_PowerOff(void)
 {
     Motor_StopAll();

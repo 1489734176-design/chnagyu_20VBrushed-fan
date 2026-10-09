@@ -22,7 +22,7 @@ void Charge_Task(void);
 /* 应用周期末调用：实际电源释放时传 0，否则传 1；按安全条件自动使能。 */
 void Charge_UpdateOutput(uint8_t power_available);
 
-/* 关闭立即生效；打开仍受输入、ADC、过压、截止锁存及电源状态约束。 */
+/* 关闭立即生效；打开仍受输入、ADC、过压、截止电压及电源状态约束。 */
 void Charge_SetEnable(uint8_t enable);
 
 charge_input_state_t Charge_GetInputState(void);
@@ -38,7 +38,7 @@ uint32_t Charge_GetInputVoltageMv(void);
 /* 通路的软件输出状态，不代表测得电池充电电流。 */
 uint8_t Charge_IsEnabled(void);
 
-/* 电压截止不是充满判定，仅确认拔出才能清除此会话锁存。 */
+/* 电压截止不是充满判定；有效电压低于截止值后清除，无需拔插充电器。 */
 uint8_t Charge_IsVoltageStopped(void);
 
 #endif /* __CHARGE_H */

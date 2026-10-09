@@ -18,11 +18,11 @@
 /* 适配器输入检测独立于充电使能：可以检测插拔，但不代表允许充电。 */
 #define CHARGE_INPUT_DETECTION_ENABLE      (1U)
 
-/* 硬件适配器负责恒流，软件启用通路并在 VBus 达到截止电压后锁存关闭。 */
+/* 硬件适配器负责恒流，VBus 达到截止电压即关闭，低于截止电压可重新开启。 */
 #define CHARGE_MANAGEMENT_ENABLE           (1U)
-#define CHARGE_STOP_VOLTAGE_MV             (20000UL)
+#define CHARGE_STOP_VOLTAGE_MV             (22500UL)
 
-/* 外部供电存在检测初值，兼容恒流时输出降压；须实测最低输出并校准。 */
+/* C+ > 18.5 V 确认插入并允许充电，<= 18.0 V 确认拔出；须实测校准。 */
 #define CHARGE_INPUT_INSERT_MV             (18500UL)
 #define CHARGE_INPUT_REMOVE_MV             (18000UL)
 #define CHARGE_INPUT_FILTER_TICKS          (100U)
